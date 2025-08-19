@@ -13,7 +13,7 @@ const TARGET_COORDINATES = {
     latitude: 5.1054, // Temp: UCC Sam Jonah Library Latitude
     longitude: -1.2905, // Temp: UCC Sam Jonah Library Longitude
 };
-const MAX_DISTANCE_METERS = 2; // Approx 6 feet for precise location check
+const MAX_DISTANCE_METERS = 5; // Approx 16 feet for precise location check
 const QR_CODE_SECRET = "vibrant-aging-attendance-app:auth-v1";
 const QR_READER_ELEMENT_ID = "qr-reader";
 
