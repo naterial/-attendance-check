@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { Worker } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AddWorkerForm } from '@/components/add-worker-form';
-import { PlusCircle, Users, LogOut } from 'lucide-react';
+import { PlusCircle, Users, LogOut, QrCode } from 'lucide-react';
 
 export default function AdminPage() {
     const router = useRouter();
@@ -44,10 +45,19 @@ export default function AdminPage() {
     return (
         <div className="min-h-screen bg-background font-body p-4">
             <header className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold font-headline text-primary">Admin Dashboard</h1>
-                <Button variant="ghost" onClick={handleLogout}>
-                    <LogOut className="mr-2" /> Logout
-                </Button>
+                <Link href="/" passHref>
+                   <h1 className="text-3xl font-bold font-headline text-primary cursor-pointer hover:underline">Admin Dashboard</h1>
+                </Link>
+                <div className="flex items-center gap-4">
+                     <Link href="/qr-code" passHref>
+                        <Button variant="outline">
+                            <QrCode className="mr-2" /> View QR Code
+                        </Button>
+                    </Link>
+                    <Button variant="ghost" onClick={handleLogout}>
+                        <LogOut className="mr-2" /> Logout
+                    </Button>
+                </div>
             </header>
             <main className="container mx-auto">
                 <Card>
