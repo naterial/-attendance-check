@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -11,16 +12,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { AddWorkerForm } from '@/components/add-worker-form';
 import { EditWorkerForm } from '@/components/edit-worker-form';
-import { PlusCircle, Users, LogOut, QrCode, Edit, Trash2, Download } from 'lucide-react';
+import { PlusCircle, Users, LogOut, QrCode, Edit, Trash2, Download, MapPin, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminPage() {
     const router = useRouter();
+    const { toast } = useToast();
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [isAddWorkerOpen, setAddWorkerOpen] = useState(false);
     const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
+    const [centerLocation, setCenterLocation] = useState<{ lat: number; lon: number } | null>(null);
+    const [isSettingLocation, setIsSettingLocation] = useState(false);
 
     useEffect(() => {
         const isAuthenticated = localStorage.getItem('isAdminAuthenticated');
@@ -31,6 +36,11 @@ export default function AdminPage() {
         const storedWorkers = localStorage.getItem('workers');
         if (storedWorkers) {
             setWorkers(JSON.parse(storedWorkers));
+        }
+
+        const storedLocation = localStorage.getItem('centerLocation');
+        if (storedLocation) {
+            setCenterLocation(JSON.parse(storedLocation));
         }
     }, [router]);
 
@@ -58,6 +68,43 @@ export default function AdminPage() {
     const handleLogout = () => {
         localStorage.removeItem('isAdminAuthenticated');
         router.push('/admin/login');
+    };
+
+    const handleSetLocation = () => {
+        setIsSettingLocation(true);
+        if (!navigator.geolocation) {
+            toast({
+                variant: 'destructive',
+                title: 'Geolocation Not Supported',
+                description: 'Your browser does not support geolocation.',
+            });
+            setIsSettingLocation(false);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const newLocation = {
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude,
+                };
+                localStorage.setItem('centerLocation', JSON.stringify(newLocation));
+                setCenterLocation(newLocation);
+                toast({
+                    title: 'Location Set!',
+                    description: 'The new center location has been saved.',
+                });
+                setIsSettingLocation(false);
+            },
+            (error) => {
+                toast({
+                    variant: 'destructive',
+                    title: 'Failed to Get Location',
+                    description: error.message,
+                });
+                setIsSettingLocation(false);
+            }
+        );
     };
 
     const handleExportPdf = () => {
@@ -142,7 +189,27 @@ export default function AdminPage() {
                     </Button>
                 </div>
             </header>
-            <main className="container mx-auto px-0">
+            <main className="container mx-auto px-0 space-y-8">
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Center Location</CardTitle>
+                        <CardDescription>Set the official GPS location for attendance verification.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                        <Button onClick={handleSetLocation} disabled={isSettingLocation}>
+                            {isSettingLocation ? <Loader2 className="mr-2 animate-spin" /> : <MapPin className="mr-2" />}
+                            {isSettingLocation ? 'Fetching...' : 'Set Current Location as Center'}
+                        </Button>
+                        {centerLocation ? (
+                            <div className="text-sm text-muted-foreground p-2 rounded-md bg-muted">
+                                <p className="font-semibold">Current Location Set:</p>
+                                <p>Lat: {centerLocation.lat.toFixed(6)}, Lon: {centerLocation.lon.toFixed(6)}</p>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-destructive-foreground p-2 rounded-md bg-destructive/80">No location has been set yet.</p>
+                        )}
+                    </CardContent>
+                </Card>
                 <Card>
                     <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                         <div>
@@ -250,3 +317,5 @@ export default function AdminPage() {
         </div>
     );
 }
+
+    

@@ -7,10 +7,27 @@ import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, CameraOff, Video, MapPinOff } from 'lucide-react';
+import { Loader2, ArrowLeft, Video, MapPin } from 'lucide-react';
 
 const QR_CODE_SECRET = "vibrant-aging-attendance-app:auth-v1";
 const QR_READER_ELEMENT_ID = "qr-reader";
+const MAX_ALLOWED_DISTANCE_METERS = 5; 
+
+// Haversine formula to calculate distance between two lat/lon points
+const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+};
 
 export default function ScanPage() {
     const router = useRouter();
@@ -19,17 +36,65 @@ export default function ScanPage() {
     const [errorMessage, setErrorMessage] = useState('');
     const scannerRef = useRef<Html5Qrcode | null>(null);
 
-    const handleScanSuccess = (decodedText: string) => {
+    const cleanupScanner = async () => {
+        if (scannerRef.current && scannerRef.current.isScanning) {
+            try {
+                await scannerRef.current.stop();
+            } catch (e) {
+                console.error("Failed to stop scanner cleanly:", e);
+            }
+        }
+    };
+
+    const handleVerification = () => {
+        setStatus('verifying');
+
+        const storedLocation = localStorage.getItem('centerLocation');
+        if (!storedLocation) {
+            setStatus('error');
+            setErrorMessage("The center's location has not been set by an admin yet.");
+            return;
+        }
+        const centerLocation = JSON.parse(storedLocation);
+
+        if (!navigator.geolocation) {
+            setStatus('error');
+            setErrorMessage("Geolocation is not supported by your browser.");
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const userLat = position.coords.latitude;
+                const userLon = position.coords.longitude;
+
+                const distance = getDistanceInMeters(userLat, userLon, centerLocation.lat, centerLocation.lon);
+
+                if (distance <= MAX_ALLOWED_DISTANCE_METERS) {
+                    setStatus('success');
+                    toast({
+                        title: 'Location Verified!',
+                        description: 'Redirecting to the attendance form.',
+                    });
+                    router.push('/attendance');
+                } else {
+                    setStatus('error');
+                    setErrorMessage(`You are too far from the centre. Please move closer and try again. Distance: ${Math.round(distance)}m`);
+                }
+            },
+            (error) => {
+                setStatus('error');
+                setErrorMessage(`Could not get your location: ${error.message}`);
+            },
+            { enableHighAccuracy: true }
+        );
+    };
+
+    const handleScanSuccess = async (decodedText: string) => {
         if (scannerRef.current?.getState() === Html5QrcodeScannerState.SCANNING) {
-            scannerRef.current.stop();
+            await cleanupScanner();
             if (decodedText === QR_CODE_SECRET) {
-                // Bypass location check for testing
-                setStatus('success');
-                toast({
-                    title: 'QR Code Verified!',
-                    description: 'Redirecting to the attendance form.',
-                });
-                router.push('/attendance');
+                handleVerification();
             } else {
                 setStatus('error');
                 setErrorMessage("Invalid QR Code. Please scan the official QR code.");
@@ -44,49 +109,41 @@ export default function ScanPage() {
     
     useEffect(() => {
         const startScanner = async () => {
-             // Create a new instance of the scanner
+            if (!document.getElementById(QR_READER_ELEMENT_ID)) return;
+            
             const scanner = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
             scannerRef.current = scanner;
 
             try {
-                // Check for camera permissions first
-                 const devices = await Html5Qrcode.getCameras();
-                 if (devices && devices.length) {
-                    await scanner.start(
-                        { facingMode: "environment" },
-                        { 
-                            fps: 10, 
-                            qrbox: (viewfinderWidth, viewfinderHeight) => {
-                                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                                const qrboxSize = Math.floor(minEdge * 0.7);
-                                return { width: qrboxSize, height: qrboxSize };
-                            },
+                 await scanner.start(
+                    { facingMode: "environment" },
+                    { 
+                        fps: 10, 
+                        qrbox: (viewfinderWidth, viewfinderHeight) => {
+                            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                            const qrboxSize = Math.floor(minEdge * 0.7);
+                            return { width: qrboxSize, height: qrboxSize };
                         },
-                        handleScanSuccess,
-                        handleScanError
-                    );
-                 } else {
-                     setStatus('error');
-                     setErrorMessage("No camera devices found on this device.");
-                 }
+                    },
+                    handleScanSuccess,
+                    handleScanError
+                );
             } catch (err: any) {
                  setStatus('error');
                  if (err.name === 'NotAllowedError') {
-                    setErrorMessage("Camera access was denied. Please enable camera permissions in your browser settings and try again.");
+                    setErrorMessage("Camera access was denied. Please enable camera permissions and try again.");
                  } else {
-                    setErrorMessage(`Failed to start the camera. ${err.message || 'Please try again.'}`);
+                    setErrorMessage(`Failed to start camera. ${err.message || 'Please try again.'}`);
                  }
             }
-        }
-        
-        if (status === 'scanning' && document.getElementById(QR_READER_ELEMENT_ID)) {
+        };
+
+        if (status === 'scanning') {
             startScanner();
         }
 
         return () => {
-            if (scannerRef.current && scannerRef.current.isScanning) {
-                scannerRef.current.stop().catch(e => console.error("Failed to stop scanner cleanly", e));
-            }
+            cleanupScanner();
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status]);
@@ -102,7 +159,7 @@ export default function ScanPage() {
                 return (
                     <div className="flex flex-col items-center justify-center text-center p-8 h-full">
                         <Loader2 className="w-16 h-16 animate-spin text-primary mb-4" />
-                        <h2 className="text-2xl font-bold">Verifying...</h2>
+                        <h2 className="text-2xl font-bold">Verifying Location...</h2>
                         <p className="text-muted-foreground">Please wait a moment.</p>
                     </div>
                 );
@@ -175,3 +232,5 @@ export default function ScanPage() {
         </div>
     );
 }
+
+    
