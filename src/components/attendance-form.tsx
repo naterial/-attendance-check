@@ -17,12 +17,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { AttendanceRecord } from "@/lib/types";
+import type { AttendanceRecord, WorkerRole, Shift } from "@/lib/types";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(50),
-  team: z.enum(["Frontend", "Backend", "Full Stack"], {
-    required_error: "Please select a team.",
+  role: z.enum(["Carer", "Cook", "Cleaner", "Executive", "Volunteer"], {
+    required_error: "Please select a role.",
+  }),
+  shift: z.enum(["Morning", "Afternoon", "Off Day"], {
+    required_error: "Please select a shift.",
   }),
   notes: z.string().min(5, "Notes must be at least 5 characters.").max(500),
 });
@@ -38,7 +41,8 @@ export function AttendanceForm({ onSubmit }: AttendanceFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      team: undefined,
+      role: undefined,
+      shift: undefined,
       notes: "",
     },
   });
@@ -72,20 +76,44 @@ export function AttendanceForm({ onSubmit }: AttendanceFormProps) {
             />
             <FormField
               control={form.control}
-              name="team"
+              name="role"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Team</FormLabel>
+                  <FormLabel>Role</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select your team" />
+                        <SelectValue placeholder="Select your role" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Frontend">Frontend</SelectItem>
-                      <SelectItem value="Backend">Backend</SelectItem>
-                      <SelectItem value="Full Stack">Full Stack</SelectItem>
+                      <SelectItem value="Carer">Carer</SelectItem>
+                      <SelectItem value="Cook">Cook</SelectItem>
+                      <SelectItem value="Cleaner">Cleaner</SelectItem>
+                      <SelectItem value="Executive">Executive</SelectItem>
+                      <SelectItem value="Volunteer">Volunteer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="shift"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Shift</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your shift" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Morning">Morning</SelectItem>
+                      <SelectItem value="Afternoon">Afternoon</SelectItem>
+                      <SelectItem value="Off Day">Off Day</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

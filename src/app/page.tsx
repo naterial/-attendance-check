@@ -10,20 +10,23 @@ const initialRecords: AttendanceRecord[] = [
   {
     id: '1',
     name: 'Ada Lovelace',
-    team: 'Backend',
-    notes: 'Developed the first algorithm intended to be processed by a machine. Working on analytics engine.',
+    role: 'Carer',
+    shift: 'Morning',
+    notes: 'Assisted residents with morning routines.',
   },
   {
     id: '2',
     name: 'Grace Hopper',
-    team: 'Full Stack',
-    notes: 'Pioneered work on compilers and COBOL. Debugging some legacy systems today.',
+    role: 'Cook',
+    shift: 'Afternoon',
+    notes: 'Prepared lunch and dinner for the residents.',
   },
     {
     id: '3',
     name: 'Hedy Lamarr',
-    team: 'Frontend',
-    notes: 'Co-invented frequency-hopping spread spectrum. Focused on UI enhancements for the new communication module.',
+    role: 'Cleaner',
+    shift: 'Morning',
+    notes: 'Cleaned the common areas and resident rooms.',
   },
 ];
 
@@ -44,7 +47,7 @@ export default function Home() {
       <main className="container mx-auto px-4 py-8 md:px-6 md:py-12">
         <header className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary mb-2">
-            Attendance Hub
+            Community Home Attendance
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             A central place for team members to log their daily attendance and share quick updates.
