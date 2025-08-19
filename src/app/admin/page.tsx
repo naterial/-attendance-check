@@ -8,13 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { Worker } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { AddWorkerForm } from '@/components/add-worker-form';
-import { PlusCircle, Users, LogOut, QrCode } from 'lucide-react';
+import { EditWorkerForm } from '@/components/edit-worker-form';
+import { PlusCircle, Users, LogOut, QrCode, Edit, Trash2 } from 'lucide-react';
 
 export default function AdminPage() {
     const router = useRouter();
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [isAddWorkerOpen, setAddWorkerOpen] = useState(false);
+    const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
 
     useEffect(() => {
         const isAuthenticated = localStorage.getItem('isAdminAuthenticated');
@@ -22,7 +25,6 @@ export default function AdminPage() {
             router.push('/admin/login');
         }
         
-        // In a real app, you'd fetch this from a database.
         const storedWorkers = localStorage.getItem('workers');
         if (storedWorkers) {
             setWorkers(JSON.parse(storedWorkers));
@@ -35,6 +37,19 @@ export default function AdminPage() {
         setWorkers(updatedWorkers);
         localStorage.setItem('workers', JSON.stringify(updatedWorkers));
         setAddWorkerOpen(false);
+    };
+
+    const handleUpdateWorker = (updatedWorker: Worker) => {
+        const updatedWorkers = workers.map(w => w.id === updatedWorker.id ? updatedWorker : w);
+        setWorkers(updatedWorkers);
+        localStorage.setItem('workers', JSON.stringify(updatedWorkers));
+        setEditingWorker(null);
+    };
+
+    const handleDeleteWorker = (workerId: string) => {
+        const updatedWorkers = workers.filter(w => w.id !== workerId);
+        setWorkers(updatedWorkers);
+        localStorage.setItem('workers', JSON.stringify(updatedWorkers));
     };
     
     const handleLogout = () => {
@@ -89,16 +104,48 @@ export default function AdminPage() {
                                         <TableHead>Name</TableHead>
                                         <TableHead>Role</TableHead>
                                         <TableHead>Shift</TableHead>
-                                        <TableHead>4-Digit PIN</TableHead>
+                                        <TableHead>PIN</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {workers.map((worker) => (
                                         <TableRow key={worker.id}>
-                                            <TableCell>{worker.name}</TableCell>
+                                            <TableCell className="font-medium">{worker.name}</TableCell>
                                             <TableCell>{worker.role}</TableCell>
                                             <TableCell>{worker.shift}</TableCell>
-                                            <TableCell>{worker.pin}</TableCell>
+                                            <TableCell>****</TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button variant="outline" size="icon" onClick={() => setEditingWorker(worker)}>
+                                                        <Edit className="h-4 w-4" />
+                                                        <span className="sr-only">Edit</span>
+                                                    </Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="destructive" size="icon">
+                                                                <Trash2 className="h-4 w-4" />
+                                                                <span className="sr-only">Delete</span>
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    This action cannot be undone. This will permanently delete the worker
+                                                                    and all associated attendance records.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDeleteWorker(worker.id)}>
+                                                                    Delete
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -117,6 +164,21 @@ export default function AdminPage() {
                     </CardContent>
                 </Card>
             </main>
+
+            {editingWorker && (
+                 <Dialog open={!!editingWorker} onOpenChange={(isOpen) => !isOpen && setEditingWorker(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Edit Worker Details</DialogTitle>
+                        </DialogHeader>
+                        <EditWorkerForm
+                            worker={editingWorker}
+                            onSubmit={handleUpdateWorker}
+                            onCancel={() => setEditingWorker(null)}
+                         />
+                    </DialogContent>
+                </Dialog>
+            )}
         </div>
     );
 }
