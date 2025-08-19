@@ -34,9 +34,10 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface AddWorkerFormProps {
     onSubmit: (data: Omit<Worker, 'id'>) => void;
+    workers: Worker[];
 }
 
-export function AddWorkerForm({ onSubmit }: AddWorkerFormProps) {
+export function AddWorkerForm({ onSubmit, workers }: AddWorkerFormProps) {
   const { toast } = useToast();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -49,8 +50,7 @@ export function AddWorkerForm({ onSubmit }: AddWorkerFormProps) {
   });
 
   const handleSubmit = (data: FormValues) => {
-    const existingWorkers: Worker[] = JSON.parse(localStorage.getItem('workers') || '[]');
-    const isPinTaken = existingWorkers.some(w => w.pin === data.pin);
+    const isPinTaken = workers.some(w => w.pin === data.pin);
 
     if (isPinTaken) {
       form.setError("pin", {

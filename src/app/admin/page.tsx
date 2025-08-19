@@ -17,6 +17,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { getWorkers, addWorker, updateWorker, deleteWorker, getAttendanceRecords, getCenterLocation, setCenterLocation as setFirestoreLocation } from '@/lib/firestore';
 
 export default function AdminPage() {
     const router = useRouter();
@@ -26,43 +27,74 @@ export default function AdminPage() {
     const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
     const [centerLocation, setCenterLocation] = useState<{ lat: number; lon: number } | null>(null);
     const [isSettingLocation, setIsSettingLocation] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const isAuthenticated = localStorage.getItem('isAdminAuthenticated');
         if (isAuthenticated !== 'true') {
             router.push('/admin/login');
-        }
-        
-        const storedWorkers = localStorage.getItem('workers');
-        if (storedWorkers) {
-            setWorkers(JSON.parse(storedWorkers));
+            return;
         }
 
-        const storedLocation = localStorage.getItem('centerLocation');
-        if (storedLocation) {
-            setCenterLocation(JSON.parse(storedLocation));
-        }
-    }, [router]);
+        const fetchData = async () => {
+            try {
+                const [workersData, locationData] = await Promise.all([
+                    getWorkers(),
+                    getCenterLocation()
+                ]);
+                setWorkers(workersData);
+                if (locationData) {
+                    setCenterLocation(locationData);
+                }
+            } catch (error) {
+                console.error("Failed to fetch initial data:", error);
+                toast({ variant: "destructive", title: "Error", description: "Failed to load data from the database." });
+            } finally {
+                setIsLoading(false);
+            }
+        };
 
-    const handleAddWorker = (newWorker: Omit<Worker, 'id'>) => {
-        const workerWithId = { ...newWorker, id: new Date().toISOString() };
-        const updatedWorkers = [...workers, workerWithId];
-        setWorkers(updatedWorkers);
-        localStorage.setItem('workers', JSON.stringify(updatedWorkers));
-        setAddWorkerOpen(false);
+        fetchData();
+    }, [router, toast]);
+    
+    const fetchWorkers = async () => {
+        const workersData = await getWorkers();
+        setWorkers(workersData);
     };
 
-    const handleUpdateWorker = (updatedWorker: Worker) => {
-        const updatedWorkers = workers.map(w => w.id === updatedWorker.id ? updatedWorker : w);
-        setWorkers(updatedWorkers);
-        localStorage.setItem('workers', JSON.stringify(updatedWorkers));
-        setEditingWorker(null);
+    const handleAddWorker = async (newWorkerData: Omit<Worker, 'id'>) => {
+       try {
+            await addWorker(newWorkerData);
+            await fetchWorkers();
+            setAddWorkerOpen(false);
+            toast({ title: "Success", description: "New worker has been added." });
+        } catch (error) {
+            console.error("Failed to add worker:", error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to add worker." });
+        }
     };
 
-    const handleDeleteWorker = (workerId: string) => {
-        const updatedWorkers = workers.filter(w => w.id !== workerId);
-        setWorkers(updatedWorkers);
-        localStorage.setItem('workers', JSON.stringify(updatedWorkers));
+    const handleUpdateWorker = async (updatedWorker: Worker) => {
+        try {
+            await updateWorker(updatedWorker.id, updatedWorker);
+            await fetchWorkers();
+            setEditingWorker(null);
+            toast({ title: "Success", description: "Worker details have been updated." });
+        } catch (error) {
+            console.error("Failed to update worker:", error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to update worker." });
+        }
+    };
+
+    const handleDeleteWorker = async (workerId: string) => {
+        try {
+            await deleteWorker(workerId);
+            await fetchWorkers();
+            toast({ title: "Success", description: "Worker has been deleted." });
+        } catch (error) {
+            console.error("Failed to delete worker:", error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to delete worker." });
+        }
     };
     
     const handleLogout = () => {
@@ -83,18 +115,27 @@ export default function AdminPage() {
         }
 
         navigator.geolocation.getCurrentPosition(
-            (position) => {
+            async (position) => {
                 const newLocation = {
                     lat: position.coords.latitude,
                     lon: position.coords.longitude,
                 };
-                localStorage.setItem('centerLocation', JSON.stringify(newLocation));
-                setCenterLocation(newLocation);
-                toast({
-                    title: 'Location Set!',
-                    description: 'The new center location has been saved.',
-                });
-                setIsSettingLocation(false);
+                try {
+                    await setFirestoreLocation(newLocation);
+                    setCenterLocation(newLocation);
+                    toast({
+                        title: 'Location Set!',
+                        description: 'The new center location has been saved.',
+                    });
+                } catch (error) {
+                     toast({
+                        variant: 'destructive',
+                        title: 'Database Error',
+                        description: "Failed to save the location.",
+                    });
+                } finally {
+                    setIsSettingLocation(false);
+                }
             },
             (error) => {
                 toast({
@@ -108,17 +149,12 @@ export default function AdminPage() {
         );
     };
 
-    const handleExportPdf = () => {
-        const storedRecords = localStorage.getItem('attendanceRecords');
-        if (!storedRecords) {
-            alert("No attendance records to export.");
+    const handleExportPdf = async () => {
+        const records = await getAttendanceRecords();
+        if (records.length === 0) {
+            toast({ variant: 'destructive', title: 'No records to export.'});
             return;
         }
-
-        const records: AttendanceRecord[] = JSON.parse(storedRecords).map((rec: any) => ({
-            ...rec,
-            timestamp: new Date(rec.timestamp)
-        }));
 
         const doc = new jsPDF();
         
@@ -127,7 +163,6 @@ export default function AdminPage() {
         doc.setFontSize(11);
         doc.setTextColor(100);
         doc.text(`Report generated on: ${format(new Date(), 'PPP p')}`, 14, 29);
-
 
         const groupedRecords = records.reduce((acc, record) => {
             const dayKey = format(record.timestamp, 'yyyy-MM-dd');
@@ -169,6 +204,14 @@ export default function AdminPage() {
 
         doc.save(`attendance-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-12 h-12 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-background font-body p-4 md:p-6">
@@ -228,7 +271,7 @@ export default function AdminPage() {
                                 <DialogHeader>
                                     <DialogTitle>Add a New Worker</DialogTitle>
                                 </DialogHeader>
-                                <AddWorkerForm onSubmit={handleAddWorker} />
+                                <AddWorkerForm onSubmit={handleAddWorker} workers={workers} />
                             </DialogContent>
                         </Dialog>
                     </CardHeader>
@@ -268,8 +311,7 @@ export default function AdminPage() {
                                                             <AlertDialogHeader>
                                                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                                                 <AlertDialogDescription>
-                                                                    This action cannot be undone. This will permanently delete the worker
-                                                                    and all associated attendance records.
+                                                                    This action cannot be undone. This will permanently delete the worker.
                                                                 </AlertDialogDescription>
                                                             </AlertDialogHeader>
                                                             <AlertDialogFooter>
@@ -309,6 +351,7 @@ export default function AdminPage() {
                         </DialogHeader>
                         <EditWorkerForm
                             worker={editingWorker}
+                            workers={workers}
                             onSubmit={handleUpdateWorker}
                             onCancel={() => setEditingWorker(null)}
                          />
@@ -318,5 +361,3 @@ export default function AdminPage() {
         </div>
     );
 }
-
-    

@@ -34,11 +34,12 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface EditWorkerFormProps {
     worker: Worker;
+    workers: Worker[];
     onSubmit: (data: Worker) => void;
     onCancel: () => void;
 }
 
-export function EditWorkerForm({ worker, onSubmit, onCancel }: EditWorkerFormProps) {
+export function EditWorkerForm({ worker, workers, onSubmit, onCancel }: EditWorkerFormProps) {
   const { toast } = useToast();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -51,9 +52,8 @@ export function EditWorkerForm({ worker, onSubmit, onCancel }: EditWorkerFormPro
   });
 
   const handleSubmit = (data: FormValues) => {
-    const existingWorkers: Worker[] = JSON.parse(localStorage.getItem('workers') || '[]');
     // Check if the PIN is taken by *another* worker
-    const isPinTaken = existingWorkers.some(w => w.pin === data.pin && w.id !== worker.id);
+    const isPinTaken = workers.some(w => w.pin === data.pin && w.id !== worker.id);
 
     if (isPinTaken) {
       form.setError("pin", {

@@ -1,43 +1,42 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import Link from 'next/link';
 import { AttendanceCard } from "@/components/attendance-card";
 import type { AttendanceRecord } from "@/lib/types";
-import { User, QrCode, ShieldCheck } from "lucide-react";
+import { User, QrCode, ShieldCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, parse } from "date-fns";
+import { getAttendanceRecords } from "@/lib/firestore";
+import { onSnapshot, collection, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function Home() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load records from localStorage on component mount
-    const storedRecords = localStorage.getItem('attendanceRecords');
-    if (storedRecords) {
-      // Need to parse dates correctly
-      const parsedRecords = JSON.parse(storedRecords).map((rec: any) => ({
-        ...rec,
-        timestamp: new Date(rec.timestamp)
-      }));
-      setRecords(parsedRecords);
-    }
+    setIsLoading(true);
+    const q = query(collection(db, "attendanceRecords"), orderBy("timestamp", "desc"));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const fetchedRecords = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                timestamp: (data.timestamp as any).toDate()
+            } as AttendanceRecord;
+        });
+        setRecords(fetchedRecords);
+        setIsLoading(false);
+    }, (error) => {
+        console.error("Error fetching real-time records:", error);
+        setIsLoading(false);
+    });
 
-    // Listen for storage changes to update in real-time across tabs
-    const handleStorageChange = () => {
-       const storedRecords = localStorage.getItem('attendanceRecords');
-        if (storedRecords) {
-          const parsedRecords = JSON.parse(storedRecords).map((rec: any) => ({
-            ...rec,
-            timestamp: new Date(rec.timestamp)
-          }));
-          setRecords(parsedRecords);
-        }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-        window.removeEventListener('storage', handleStorageChange);
-    };
+    return () => unsubscribe();
   }, []);
   
   const groupedRecords = records.reduce((acc, record) => {
@@ -46,7 +45,6 @@ export default function Home() {
           acc[dayKey] = [];
       }
       acc[dayKey].push(record);
-      // Sort records within the day by timestamp descending
       acc[dayKey].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       return acc;
   }, {} as Record<string, AttendanceRecord[]>);
@@ -88,7 +86,11 @@ export default function Home() {
              <h2 className="text-2xl md:text-3xl font-bold font-headline">Attendance Log</h2>
              <span className="text-sm font-medium bg-muted text-muted-foreground rounded-full px-3 py-1">{records.length} Total</span>
            </div>
-          {records.length > 0 ? (
+          {isLoading ? (
+             <div className="flex justify-center py-20">
+                <Loader2 className="w-12 h-12 animate-spin text-primary" />
+              </div>
+          ) : records.length > 0 ? (
             <div className="space-y-8">
               {sortedDayKeys.map((dayKey) => (
                 <div key={dayKey}>
@@ -122,3 +124,4 @@ export default function Home() {
     </div>
   );
 }
+

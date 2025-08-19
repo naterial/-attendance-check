@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, Video, VideoOff } from 'lucide-react';
+import { getCenterLocation } from '@/lib/firestore';
 
 const QR_CODE_SECRET = "vibrant-aging-attendance-app:auth-v1";
 const QR_READER_ELEMENT_ID = "qr-reader";
@@ -48,7 +49,6 @@ export default function ScanPage() {
         scannerRef.current = null;
     };
     
-    // This effect handles the cleanup of the scanner when the component unmounts or the status changes.
     useEffect(() => {
         return () => {
             cleanupScanner();
@@ -69,43 +69,47 @@ export default function ScanPage() {
             return;
         }
 
-        const storedLocation = localStorage.getItem('centerLocation');
-        if (!storedLocation) {
-            setErrorMessage("The center's location has not been set by an admin yet.");
-            setStatus('error');
-            return;
-        }
-        const centerLocation = JSON.parse(storedLocation);
-
-        if (!navigator.geolocation) {
-            setErrorMessage("Geolocation is not supported by your browser.");
-            setStatus('error');
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const userLat = position.coords.latitude;
-                const userLon = position.coords.longitude;
-                const distance = getDistanceInMeters(userLat, userLon, centerLocation.lat, centerLocation.lon);
-                
-                if (distance <= MAX_ALLOWED_DISTANCE_METERS) {
-                    toast({
-                        title: 'Location Verified!',
-                        description: 'Redirecting to the attendance form.',
-                    });
-                    router.push('/attendance');
-                } else {
-                    setErrorMessage(`You are too far from the centre. Please move closer and try again. Distance: ${Math.round(distance)}m`);
-                    setStatus('error');
-                }
-            },
-            (error) => {
-                setErrorMessage(`Could not get your location: ${error.message}`);
+        try {
+            const centerLocation = await getCenterLocation();
+            if (!centerLocation) {
+                setErrorMessage("The center's location has not been set by an admin yet.");
                 setStatus('error');
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
+                return;
+            }
+
+            if (!navigator.geolocation) {
+                setErrorMessage("Geolocation is not supported by your browser.");
+                setStatus('error');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const userLat = position.coords.latitude;
+                    const userLon = position.coords.longitude;
+                    const distance = getDistanceInMeters(userLat, userLon, centerLocation.lat, centerLocation.lon);
+                    
+                    if (distance <= MAX_ALLOWED_DISTANCE_METERS) {
+                        toast({
+                            title: 'Location Verified!',
+                            description: 'Redirecting to the attendance form.',
+                        });
+                        router.push('/attendance');
+                    } else {
+                        setErrorMessage(`You are too far from the centre. Please move closer and try again. Distance: ${Math.round(distance)}m`);
+                        setStatus('error');
+                    }
+                },
+                (error) => {
+                    setErrorMessage(`Could not get your location: ${error.message}`);
+                    setStatus('error');
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        } catch (dbError) {
+             setErrorMessage("Could not retrieve the center's location from the database.");
+             setStatus('error');
+        }
     };
 
     const handleScanError = (error: any) => {
