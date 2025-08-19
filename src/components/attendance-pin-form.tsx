@@ -17,32 +17,27 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { AttendanceRecord } from "@/lib/types";
+import type { Worker } from "@/lib/types";
 
 const formSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters.").max(50),
-  role: z.enum(["Carer", "Cook", "Cleaner", "Executive", "Volunteer"], {
-    required_error: "Please select a role.",
-  }),
-  shift: z.enum(["Morning", "Afternoon", "Off Day"], {
-    required_error: "Please select a shift.",
-  }),
+  workerId: z.string({ required_error: "Please select your name." }),
+  pin: z.string().length(4, "PIN must be 4 digits.").regex(/^\d{4}$/, "PIN must be numeric."),
   notes: z.string().min(5, "Notes must be at least 5 characters.").max(500),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-interface AttendanceFormProps {
-    onSubmit: (data: Omit<AttendanceRecord, 'id' | 'timestamp'>) => void;
+interface AttendancePinFormProps {
+    workers: Worker[];
+    onSubmit: (data: FormValues) => void;
 }
 
-export function AttendanceForm({ onSubmit }: AttendanceFormProps) {
+export function AttendancePinForm({ workers, onSubmit }: AttendancePinFormProps) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      role: undefined,
-      shift: undefined,
+      workerId: undefined,
+      pin: "",
       notes: "",
     },
   });
@@ -56,66 +51,42 @@ export function AttendanceForm({ onSubmit }: AttendanceFormProps) {
     <Card className="w-full shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline">Mark Attendance</CardTitle>
-        <CardDescription>Fill in the form below to log your attendance.</CardDescription>
+        <CardDescription>Select your name, enter your PIN, and leave a note.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <FormField
               control={form.control}
-              name="name"
+              name="workerId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Full Name</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your name" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {workers.map((worker) => (
+                        <SelectItem key={worker.id} value={worker.id}>{worker.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="pin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>4-Digit PIN</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Jane Doe" {...field} />
+                    <Input type="password" placeholder="e.g. 1234" maxLength={4} {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="role"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Role</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Carer">Carer</SelectItem>
-                      <SelectItem value="Cook">Cook</SelectItem>
-                      <SelectItem value="Cleaner">Cleaner</SelectItem>
-                      <SelectItem value="Executive">Executive</SelectItem>
-                      <SelectItem value="Volunteer">Volunteer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="shift"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Shift</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your shift" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Morning">Morning</SelectItem>
-                      <SelectItem value="Afternoon">Afternoon</SelectItem>
-                      <SelectItem value="Off Day">Off Day</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
