@@ -6,12 +6,15 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { Worker } from '@/lib/types';
+import type { Worker, AttendanceRecord } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { AddWorkerForm } from '@/components/add-worker-form';
 import { EditWorkerForm } from '@/components/edit-worker-form';
-import { PlusCircle, Users, LogOut, QrCode, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Users, LogOut, QrCode, Edit, Trash2, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { format } from 'date-fns';
 
 export default function AdminPage() {
     const router = useRouter();
@@ -57,13 +60,78 @@ export default function AdminPage() {
         router.push('/admin/login');
     };
 
+    const handleExportPdf = () => {
+        const storedRecords = localStorage.getItem('attendanceRecords');
+        if (!storedRecords) {
+            alert("No attendance records to export.");
+            return;
+        }
+
+        const records: AttendanceRecord[] = JSON.parse(storedRecords).map((rec: any) => ({
+            ...rec,
+            timestamp: new Date(rec.timestamp)
+        }));
+
+        const doc = new jsPDF();
+        
+        doc.setFontSize(18);
+        doc.text("Vibrant Aging Community Centre - Attendance Report", 14, 22);
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text(`Report generated on: ${format(new Date(), 'PPP p')}`, 14, 29);
+
+
+        const groupedRecords = records.reduce((acc, record) => {
+            const dayKey = format(record.timestamp, 'yyyy-MM-dd');
+            if (!acc[dayKey]) {
+                acc[dayKey] = [];
+            }
+            acc[dayKey].push(record);
+            return acc;
+        }, {} as Record<string, AttendanceRecord[]>);
+
+        const sortedDayKeys = Object.keys(groupedRecords).sort((a,b) => b.localeCompare(a));
+        
+        let startY = 40;
+
+        sortedDayKeys.forEach(dayKey => {
+            const dayRecords = groupedRecords[dayKey];
+            const tableTitle = `Date: ${format(new Date(dayKey), "eeee, MMMM d, yyyy")}`;
+            
+            const tableBody = dayRecords.map(record => [
+                record.name,
+                record.role,
+                record.shift,
+                format(record.timestamp, 'p'),
+                record.notes
+            ]);
+
+            autoTable(doc, {
+                startY: startY,
+                head: [['Name', 'Role', 'Shift', 'Time', 'Notes']],
+                body: tableBody,
+                didDrawPage: (data) => {
+                    doc.setFontSize(12);
+                    doc.text(tableTitle, 14, data.cursor ? data.cursor.y - 10 : 15);
+                }
+            });
+
+            startY = (doc as any).lastAutoTable.finalY + 15;
+        });
+
+        doc.save(`attendance-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    };
+
     return (
         <div className="min-h-screen bg-background font-body p-4">
             <header className="flex justify-between items-center mb-8">
                 <Link href="/" passHref>
                    <h1 className="text-3xl font-bold font-headline text-primary cursor-pointer hover:underline">Admin Dashboard</h1>
                 </Link>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                     <Button variant="outline" onClick={handleExportPdf}>
+                        <Download className="mr-2" /> Export PDF
+                     </Button>
                      <Link href="/qr-code" passHref>
                         <Button variant="outline">
                             <QrCode className="mr-2" /> View QR Code
