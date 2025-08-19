@@ -6,6 +6,7 @@ import { AttendanceCard } from "@/components/attendance-card";
 import type { AttendanceRecord } from "@/lib/types";
 import { User, QrCode, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { format, parse } from "date-fns";
 
 export default function Home() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -38,6 +39,20 @@ export default function Home() {
         window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
+  
+  const groupedRecords = records.reduce((acc, record) => {
+      const dayKey = format(record.timestamp, 'yyyy-MM-dd');
+      if (!acc[dayKey]) {
+          acc[dayKey] = [];
+      }
+      acc[dayKey].push(record);
+      // Sort records within the day by timestamp descending
+      acc[dayKey].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      return acc;
+  }, {} as Record<string, AttendanceRecord[]>);
+
+  const sortedDayKeys = Object.keys(groupedRecords).sort((a,b) => b.localeCompare(a));
+
 
   return (
     <div className="min-h-screen bg-background font-body">
@@ -69,14 +84,26 @@ export default function Home() {
         </div>
         
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-3xl font-bold font-headline">Today's Attendance Log</h2>
-            <span className="text-sm font-medium bg-muted text-muted-foreground rounded-full px-3 py-1">{records.length} Records</span>
-          </div>
+           <div className="flex items-center justify-between mb-6">
+             <h2 className="text-3xl font-bold font-headline">Attendance Log</h2>
+             <span className="text-sm font-medium bg-muted text-muted-foreground rounded-full px-3 py-1">{records.length} Total Records</span>
+           </div>
           {records.length > 0 ? (
-            <div className="space-y-4">
-              {records.map((record) => (
-                <AttendanceCard key={record.id} record={record} />
+            <div className="space-y-8">
+              {sortedDayKeys.map((dayKey) => (
+                <div key={dayKey}>
+                  <div className="flex items-center gap-4 mb-4">
+                    <h3 className="text-xl font-bold font-headline">
+                        {format(parse(dayKey, 'yyyy-MM-dd', new Date()), "eeee, MMMM d")}
+                    </h3>
+                    <div className="flex-grow border-t border-dashed"></div>
+                  </div>
+                  <div className="space-y-4">
+                    {groupedRecords[dayKey].map((record) => (
+                      <AttendanceCard key={record.id} record={record} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
