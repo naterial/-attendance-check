@@ -9,11 +9,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, CameraOff, Video, MapPinOff } from 'lucide-react';
 
-const TARGET_COORDINATES = {
-    latitude: 5.1054, // Temp: UCC Sam Jonah Library Latitude
-    longitude: -1.2905, // Temp: UCC Sam Jonah Library Longitude
-};
-const MAX_DISTANCE_METERS = 5; // Approx 16 feet for precise location check
 const QR_CODE_SECRET = "vibrant-aging-attendance-app:auth-v1";
 const QR_READER_ELEMENT_ID = "qr-reader";
 
@@ -24,25 +19,17 @@ export default function ScanPage() {
     const [errorMessage, setErrorMessage] = useState('');
     const scannerRef = useRef<Html5Qrcode | null>(null);
 
-    const getDistance = (coords1: GeolocationCoordinates, coords2: { latitude: number, longitude: number }) => {
-        const toRad = (x: number) => x * Math.PI / 180;
-        const R = 6371e3; // metres
-        const dLat = toRad(coords2.latitude - coords1.latitude);
-        const dLon = toRad(coords2.longitude - coords1.longitude);
-        const lat1 = toRad(coords1.latitude);
-        const lat2 = toRad(coords2.latitude);
-
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    };
-
     const handleScanSuccess = (decodedText: string) => {
         if (scannerRef.current?.getState() === Html5QrcodeScannerState.SCANNING) {
             scannerRef.current.stop();
             if (decodedText === QR_CODE_SECRET) {
-                setStatus('verifying');
+                // Bypass location check for testing
+                setStatus('success');
+                toast({
+                    title: 'QR Code Verified!',
+                    description: 'Redirecting to the attendance form.',
+                });
+                router.push('/attendance');
             } else {
                 setStatus('error');
                 setErrorMessage("Invalid QR Code. Please scan the official QR code.");
@@ -54,49 +41,7 @@ export default function ScanPage() {
       // This is called frequently, so we only log for debugging.
       // console.warn(`QR_READER_ERROR: ${error}`);
     };
-
-    const verifyLocation = () => {
-        if (!navigator.geolocation) {
-            setStatus('error');
-            setErrorMessage("Geolocation is not supported by your browser. Please use a different browser.");
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const distance = getDistance(position.coords, TARGET_COORDINATES);
-                if (distance <= MAX_DISTANCE_METERS) {
-                    setStatus('success');
-                    toast({
-                        title: 'Verification Successful!',
-                        description: 'Redirecting to the attendance form.',
-                    });
-                    router.push('/attendance');
-                } else {
-                    setStatus('error');
-                    setErrorMessage(`You are too far from the centre. Please move closer and try again. Distance: ${Math.round(distance)}m`);
-                }
-            },
-            (error) => {
-                setStatus('error');
-                let message = "Unable to retrieve your location. Please enable location services in your browser settings.";
-                if (error.code === error.PERMISSION_DENIED) {
-                    message = "Location access was denied. Please enable location permissions for this site in your browser settings.";
-                }
-                setErrorMessage(message);
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-    };
     
-    useEffect(() => {
-        if (status === 'verifying') {
-            verifyLocation();
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status]);
-
-
     useEffect(() => {
         const startScanner = async () => {
              // Create a new instance of the scanner
@@ -157,8 +102,8 @@ export default function ScanPage() {
                 return (
                     <div className="flex flex-col items-center justify-center text-center p-8 h-full">
                         <Loader2 className="w-16 h-16 animate-spin text-primary mb-4" />
-                        <h2 className="text-2xl font-bold">Verifying Location...</h2>
-                        <p className="text-muted-foreground">Please wait while we confirm you're at the center.</p>
+                        <h2 className="text-2xl font-bold">Verifying...</h2>
+                        <p className="text-muted-foreground">Please wait a moment.</p>
                     </div>
                 );
             case 'success':
@@ -172,7 +117,6 @@ export default function ScanPage() {
                 return (
                     <div className="text-center p-8 flex flex-col justify-center items-center h-full">
                         <Alert variant="destructive" className="mb-6">
-                            {errorMessage.includes("Camera") ? <CameraOff className="w-6 h-6 mr-2"/> : <MapPinOff className="w-6 h-6 mr-2" />}
                             <AlertTitle>Error</AlertTitle>
                             <AlertDescription>{errorMessage}</AlertDescription>
                         </Alert>
