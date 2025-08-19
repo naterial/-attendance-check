@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, CameraOff, Video, MapPinOff } from 'lucide-react';
 
 const TARGET_COORDINATES = {
-    latitude: 37.7749, // Replace with Community Centre's Latitude
-    longitude: -122.4194, // Replace with Community Centre's Longitude
+    latitude: 5.1054, // Temp: UCC Sam Jonah Library Latitude
+    longitude: -1.2905, // Temp: UCC Sam Jonah Library Longitude
 };
 const MAX_DISTANCE_METERS = 2; // Approx 6 feet for precise location check
 const QR_CODE_SECRET = "vibrant-aging-attendance-app:auth-v1";
@@ -232,5 +232,3 @@ export default function ScanPage() {
         </div>
     );
 }
-
-    
