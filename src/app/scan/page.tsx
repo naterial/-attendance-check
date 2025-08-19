@@ -13,7 +13,7 @@ const TARGET_COORDINATES = {
     longitude: -122.4194, // Replace with Community Centre's Longitude
 };
 const MAX_DISTANCE_METERS = 20;
-const QR_CODE_SECRET = "VibrantAgingCommunityCentreSecret";
+const QR_CODE_SECRET = "vibrant-aging-attendance-app:auth-v1";
 const QR_READER_ELEMENT_ID = "qr-reader";
 
 export default function ScanPage() {
@@ -52,7 +52,7 @@ export default function ScanPage() {
     const handleScanError = (error: any) => {
       // The library calls this often, even when just searching for a QR code.
       // We are only concerned with permission errors here.
-      if (error.includes('NotAllowedError') || error.includes('NotFoundError')) {
+      if (typeof error === 'string' && (error.includes('NotAllowedError') || error.includes('NotFoundError'))) {
         setHasCameraPermission(false);
       }
       console.warn(`QR_READER_ERROR: ${error}`);
@@ -107,12 +107,16 @@ export default function ScanPage() {
         // Cleanup on component unmount
         if (scanner) {
           try {
-            scanner.clear();
+            // Check if scanning is in progress before clearing
+            if (scanner.getState() === 2) { // 2 is SCANNING state
+                 scanner.clear();
+            }
           } catch(e) {
             console.error("Failed to clear scanner", e);
           }
         }
       };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status, hasCameraPermission]);
 
     const renderContent = () => {

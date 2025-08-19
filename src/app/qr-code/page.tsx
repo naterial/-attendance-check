@@ -13,11 +13,12 @@ export default function QrCodePage() {
         const generateQrCode = async () => {
             try {
                 const QRCode = await import('qrcode');
-                const url = await QRCode.toDataURL("VibrantAgingCommunityCentreSecret", {
+                // Using a more unique, non-URL-like value.
+                const url = await QRCode.toDataURL("vibrant-aging-attendance-app:auth-v1", {
                     width: 400,
                     margin: 2,
                     color: {
-                        dark: '#3B0764', // Dark purple
+                        dark: '#000000', // Black for better compatibility
                         light: '#FFFFFF'
                     }
                 });
