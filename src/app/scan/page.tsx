@@ -19,9 +19,8 @@ const QR_READER_ELEMENT_ID = "qr-reader";
 export default function ScanPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const [status, setStatus] = useState<'idle' | 'scanning' | 'verifying' | 'success' | 'error'>('idle'); 
+    const [status, setStatus] = useState<'idle' | 'scanning' | 'verifying' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
-    const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
     const scannerRef = useRef<Html5Qrcode | null>(null);
 
     const getDistance = (coords1: GeolocationCoordinates, coords2: { latitude: number, longitude: number }) => {
@@ -38,16 +37,10 @@ export default function ScanPage() {
         return R * c;
     };
 
-    const handleScanSuccess = async (decodedText: string) => {
+    const handleScanSuccess = (decodedText: string) => {
         if (scannerRef.current?.getState() === Html5QrcodeScannerState.SCANNING) {
-            try {
-                await scannerRef.current.stop();
-            } catch (e) {
-                console.warn("Scanner already stopped or failed to stop:", e)
-            }
             if (decodedText === QR_CODE_SECRET) {
                 setStatus('verifying');
-                verifyLocation();
             } else {
                 setStatus('error');
                 setErrorMessage("Invalid QR Code. Please scan the official QR code.");
@@ -93,38 +86,57 @@ export default function ScanPage() {
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     };
+    
+    useEffect(() => {
+        if (status === 'verifying') {
+            verifyLocation();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [status]);
+
 
     useEffect(() => {
+        if (status !== 'scanning' || !document.getElementById(QR_READER_ELEMENT_ID)) {
+            return;
+        }
+
         const startScanner = async () => {
-            if (status !== 'scanning' || hasCameraPermission !== true || !document.getElementById(QR_READER_ELEMENT_ID)) return;
-    
+             // Create a new instance of the scanner
             const scanner = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
             scannerRef.current = scanner;
-    
-            try {
-                await scanner.start(
-                    { facingMode: "environment" },
-                    { 
-                        fps: 10, 
-                        qrbox: (viewfinderWidth, viewfinderHeight) => {
-                            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                            const qrboxSize = Math.floor(minEdge * 0.7);
-                            return { width: qrboxSize, height: qrboxSize };
-                        },
-                    },
-                    handleScanSuccess,
-                    handleScanError
-                );
-            } catch (err) {
-                 console.error("Scanner start error:", err);
-                 setStatus('error');
-                 setErrorMessage("Failed to start the camera. It might be in use by another application or permissions were denied.");
-            }
-        };
 
-        if(status === 'scanning' && hasCameraPermission) {
-            startScanner();
+            try {
+                // Check for camera permissions first
+                 const devices = await Html5Qrcode.getCameras();
+                 if (devices && devices.length) {
+                    await scanner.start(
+                        { facingMode: "environment" },
+                        { 
+                            fps: 10, 
+                            qrbox: (viewfinderWidth, viewfinderHeight) => {
+                                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                                const qrboxSize = Math.floor(minEdge * 0.7);
+                                return { width: qrboxSize, height: qrboxSize };
+                            },
+                        },
+                        handleScanSuccess,
+                        handleScanError
+                    );
+                 } else {
+                     setStatus('error');
+                     setErrorMessage("No camera devices found on this device.");
+                 }
+            } catch (err: any) {
+                 setStatus('error');
+                 if (err.name === 'NotAllowedError') {
+                    setErrorMessage("Camera access was denied. Please enable camera permissions in your browser settings and try again.");
+                 } else {
+                    setErrorMessage(`Failed to start the camera. ${err.message || 'Please try again.'}`);
+                 }
+            }
         }
+        
+        startScanner();
 
         return () => {
             if (scannerRef.current && scannerRef.current.isScanning) {
@@ -132,22 +144,11 @@ export default function ScanPage() {
             }
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status, hasCameraPermission]);
+    }, [status]);
 
 
-    const requestCameraAndStart = async () => {
-        setStatus('scanning');
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            // Stop the tracks immediately to free up the camera for the library
-            stream.getTracks().forEach(track => track.stop());
-            setHasCameraPermission(true);
-        } catch (err) {
-            console.error("Camera permission error:", err);
-            setHasCameraPermission(false);
-            setErrorMessage("Camera access was denied. Please enable camera permissions in your browser settings and refresh the page.");
-            setStatus('error');
-        }
+    const requestCameraAndStart = () => {
+       setStatus('scanning');
     };
 
     const renderContent = () => {
@@ -177,7 +178,6 @@ export default function ScanPage() {
                         </Alert>
                         <Button onClick={() => {
                             setErrorMessage('');
-                            setHasCameraPermission(null);
                             setStatus('idle');
                         }}>
                             Try Again
@@ -185,10 +185,6 @@ export default function ScanPage() {
                     </div>
                 );
             case 'scanning':
-                if (hasCameraPermission === false) {
-                     // The error state will render, this prevents flicker
-                     return null;
-                }
                 return (
                     <div className="relative w-full h-full bg-black">
                        <div id={QR_READER_ELEMENT_ID} className="w-full h-full" />
@@ -206,7 +202,7 @@ export default function ScanPage() {
                     <div className="p-12 text-center flex flex-col items-center justify-center h-full">
                         <Video className="w-16 h-16 text-primary mb-4" />
                         <h2 className="text-2xl font-bold mb-2">Ready to Scan</h2>
-                        <p className="text-muted-foreground mb-6">Please grant camera access to begin.</p>
+                        <p className="text-muted-foreground mb-6">Press the button to start the camera.</p>
                         <Button size="lg" onClick={requestCameraAndStart}>
                             Start Camera
                         </Button>
@@ -235,5 +231,3 @@ export default function ScanPage() {
         </div>
     );
 }
-
-    
