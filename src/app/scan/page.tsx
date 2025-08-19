@@ -40,6 +40,7 @@ export default function ScanPage() {
 
     const handleScanSuccess = (decodedText: string) => {
         if (scannerRef.current?.getState() === Html5QrcodeScannerState.SCANNING) {
+            scannerRef.current.stop();
             if (decodedText === QR_CODE_SECRET) {
                 setStatus('verifying');
             } else {
@@ -97,10 +98,6 @@ export default function ScanPage() {
 
 
     useEffect(() => {
-        if (status !== 'scanning' || !document.getElementById(QR_READER_ELEMENT_ID)) {
-            return;
-        }
-
         const startScanner = async () => {
              // Create a new instance of the scanner
             const scanner = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
@@ -137,7 +134,9 @@ export default function ScanPage() {
             }
         }
         
-        startScanner();
+        if (status === 'scanning' && document.getElementById(QR_READER_ELEMENT_ID)) {
+            startScanner();
+        }
 
         return () => {
             if (scannerRef.current && scannerRef.current.isScanning) {
