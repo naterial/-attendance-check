@@ -37,6 +37,7 @@ export default function AdminPage() {
         }
 
         const fetchData = async () => {
+            setIsLoading(true);
             try {
                 const [workersData, locationData] = await Promise.all([
                     getWorkers(),
@@ -128,6 +129,7 @@ export default function AdminPage() {
                         description: 'The new center location has been saved.',
                     });
                 } catch (error) {
+                     console.error("Failed to save location:", error);
                      toast({
                         variant: 'destructive',
                         title: 'Database Error',

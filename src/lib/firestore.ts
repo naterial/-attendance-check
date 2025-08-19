@@ -1,3 +1,4 @@
+
 import { db } from './firebase';
 import { 
     collection, 
@@ -9,7 +10,9 @@ import {
     query, 
     orderBy, 
     where,
-    Timestamp
+    Timestamp,
+    setDoc,
+    getDoc
 } from 'firebase/firestore';
 import type { Worker, AttendanceRecord, Shift, WorkerRole } from './types';
 
@@ -80,12 +83,12 @@ export const getAttendanceRecords = async (): Promise<AttendanceRecord[]> => {
 // Center Location Functions
 export const setCenterLocation = async (location: { lat: number, lon: number }): Promise<void> => {
     const locationRef = doc(db, 'config', 'centerLocation');
-    await updateDoc(locationRef, location, { merge: true });
+    // Use setDoc with merge to create the document if it doesn't exist, or update it if it does.
+    await setDoc(locationRef, location, { merge: true });
 };
 
 export const getCenterLocation = async (): Promise<{ lat: number; lon: number } | null> => {
     const locationRef = doc(db, 'config', 'centerLocation');
-    const docSnap = await getDocs(query(collection(db, 'config')));
-    const configDoc = docSnap.docs.find(d => d.id === 'centerLocation');
-    return configDoc ? configDoc.data() as { lat: number; lon: number } : null;
+    const docSnap = await getDoc(locationRef);
+    return docSnap.exists() ? docSnap.data() as { lat: number; lon: number } : null;
 };
