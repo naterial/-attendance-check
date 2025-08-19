@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { KeyRound, Mail } from 'lucide-react';
+import { KeyRound, Mail, ArrowLeft } from 'lucide-react';
 
 const ADMIN_EMAIL = "admin@vibrantaging.com";
 const ADMIN_SECRET = "123456";
@@ -41,7 +42,13 @@ export default function AdminLoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background font-body flex items-center justify-center p-4">
+        <div className="min-h-screen bg-background font-body flex items-center justify-center p-4 relative">
+             <Link href="/" passHref>
+                <Button variant="ghost" size="sm" className="absolute top-4 left-4">
+                    <ArrowLeft className="mr-2" />
+                    Back to Home
+                </Button>
+            </Link>
             <main className="container mx-auto px-4 py-8 md:px-6 md:py-12 flex justify-center">
                 <div className="w-full max-w-md">
                     <Card className="shadow-2xl">
