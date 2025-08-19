@@ -7,4 +7,5 @@ export interface AttendanceRecord {
   role: WorkerRole;
   shift: Shift;
   notes: string;
+  timestamp: Date;
 }

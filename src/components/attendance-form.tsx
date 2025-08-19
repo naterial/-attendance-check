@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { AttendanceRecord, WorkerRole, Shift } from "@/lib/types";
+import type { AttendanceRecord } from "@/lib/types";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(50),
@@ -33,7 +33,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 interface AttendanceFormProps {
-    onSubmit: (data: Omit<AttendanceRecord, 'id'>) => void;
+    onSubmit: (data: Omit<AttendanceRecord, 'id' | 'timestamp'>) => void;
 }
 
 export function AttendanceForm({ onSubmit }: AttendanceFormProps) {

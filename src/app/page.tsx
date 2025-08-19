@@ -6,38 +6,14 @@ import { AttendanceCard } from "@/components/attendance-card";
 import type { AttendanceRecord } from "@/lib/types";
 import { User } from "lucide-react";
 
-const initialRecords: AttendanceRecord[] = [
-  {
-    id: '1',
-    name: 'Ada Lovelace',
-    role: 'Carer',
-    shift: 'Morning',
-    notes: 'Assisted residents with morning routines.',
-  },
-  {
-    id: '2',
-    name: 'Grace Hopper',
-    role: 'Cook',
-    shift: 'Afternoon',
-    notes: 'Prepared lunch and dinner for the residents.',
-  },
-    {
-    id: '3',
-    name: 'Hedy Lamarr',
-    role: 'Cleaner',
-    shift: 'Morning',
-    notes: 'Cleaned the common areas and resident rooms.',
-  },
-];
-
-
 export default function Home() {
-  const [records, setRecords] = useState<AttendanceRecord[]>(initialRecords);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
 
-  const handleAddRecord = (data: Omit<AttendanceRecord, 'id'>) => {
+  const handleAddRecord = (data: Omit<AttendanceRecord, 'id' | 'timestamp'>) => {
     const newRecord: AttendanceRecord = {
       ...data,
       id: new Date().toISOString() + Math.random(),
+      timestamp: new Date(),
     };
     setRecords(prev => [newRecord, ...prev]);
   };
@@ -47,7 +23,7 @@ export default function Home() {
       <main className="container mx-auto px-4 py-8 md:px-6 md:py-12">
         <header className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary mb-2">
-            Community Home Attendance
+            Vibrant Aging Community Centre
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             A central place for team members to log their daily attendance and share quick updates.
