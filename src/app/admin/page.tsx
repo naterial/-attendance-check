@@ -123,18 +123,18 @@ export default function AdminPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background font-body p-4">
-            <header className="flex justify-between items-center mb-8">
+        <div className="min-h-screen bg-background font-body p-4 md:p-6">
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <Link href="/" passHref>
-                   <h1 className="text-3xl font-bold font-headline text-primary cursor-pointer hover:underline">Admin Dashboard</h1>
+                   <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary cursor-pointer hover:underline">Admin Dashboard</h1>
                 </Link>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                      <Button variant="outline" onClick={handleExportPdf}>
                         <Download className="mr-2" /> Export PDF
                      </Button>
                      <Link href="/qr-code" passHref>
                         <Button variant="outline">
-                            <QrCode className="mr-2" /> View QR Code
+                            <QrCode className="mr-2" /> View QR
                         </Button>
                     </Link>
                     <Button variant="ghost" onClick={handleLogout}>
@@ -142,9 +142,9 @@ export default function AdminPage() {
                     </Button>
                 </div>
             </header>
-            <main className="container mx-auto">
+            <main className="container mx-auto px-0">
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
+                    <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                         <div>
                             <CardTitle>Worker Management</CardTitle>
                             <CardDescription>Add, view, and manage worker details.</CardDescription>
@@ -170,8 +170,8 @@ export default function AdminPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Name</TableHead>
-                                        <TableHead>Role</TableHead>
-                                        <TableHead>Shift</TableHead>
+                                        <TableHead className="hidden md:table-cell">Role</TableHead>
+                                        <TableHead className="hidden md:table-cell">Shift</TableHead>
                                         <TableHead>PIN</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -180,8 +180,8 @@ export default function AdminPage() {
                                     {workers.map((worker) => (
                                         <TableRow key={worker.id}>
                                             <TableCell className="font-medium">{worker.name}</TableCell>
-                                            <TableCell>{worker.role}</TableCell>
-                                            <TableCell>{worker.shift}</TableCell>
+                                            <TableCell className="hidden md:table-cell">{worker.role}</TableCell>
+                                            <TableCell className="hidden md:table-cell">{worker.shift}</TableCell>
                                             <TableCell>****</TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-2">

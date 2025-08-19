@@ -56,44 +56,44 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background font-body">
-      <header className="absolute top-4 right-4">
+      <header className="absolute top-4 right-4 z-10">
           <Link href="/admin/login" passHref>
             <Button variant="outline">
               <ShieldCheck className="mr-2" />
-              Admin Login
+              Admin
             </Button>
           </Link>
         </header>
       <main className="container mx-auto px-4 py-8 md:px-6 md:py-12">
-        <header className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary mb-2">
+        <header className="text-center mb-10 md:mb-12">
+          <h1 className="text-3xl md:text-5xl font-bold font-headline text-primary mb-2">
             Vibrant Aging Community Centre
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            A central place for team members to log their daily attendance and share quick updates.
+          <p className="text-md md:text-lg text-muted-foreground max-w-2xl mx-auto">
+            A central place for team members to log their daily attendance.
           </p>
         </header>
 
-        <div className="text-center mb-12">
+        <div className="text-center mb-10 md:mb-12">
           <Link href="/scan" passHref>
-            <Button size="lg" className="h-14 text-lg">
-              <QrCode className="mr-3 size-6" />
-              Scan QR to Sign In
+            <Button size="lg" className="h-12 text-md md:h-14 md:text-lg">
+              <QrCode className="mr-3 size-5 md:size-6" />
+              Scan to Sign In
             </Button>
           </Link>
         </div>
         
         <div className="max-w-4xl mx-auto">
            <div className="flex items-center justify-between mb-6">
-             <h2 className="text-3xl font-bold font-headline">Attendance Log</h2>
-             <span className="text-sm font-medium bg-muted text-muted-foreground rounded-full px-3 py-1">{records.length} Total Records</span>
+             <h2 className="text-2xl md:text-3xl font-bold font-headline">Attendance Log</h2>
+             <span className="text-sm font-medium bg-muted text-muted-foreground rounded-full px-3 py-1">{records.length} Total</span>
            </div>
           {records.length > 0 ? (
             <div className="space-y-8">
               {sortedDayKeys.map((dayKey) => (
                 <div key={dayKey}>
                   <div className="flex items-center gap-4 mb-4">
-                    <h3 className="text-xl font-bold font-headline">
+                    <h3 className="text-lg md:text-xl font-bold font-headline">
                         {format(parse(dayKey, 'yyyy-MM-dd', new Date()), "eeee, MMMM d")}
                     </h3>
                     <div className="flex-grow border-t border-dashed"></div>
@@ -107,14 +107,14 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-20 border-2 border-dashed rounded-lg bg-muted/50">
+            <div className="text-center py-16 md:py-20 border-2 border-dashed rounded-lg bg-muted/50">
                 <div className="flex justify-center mb-4">
                   <div className="p-4 rounded-full bg-muted-foreground/10 text-muted-foreground">
                       <User className="w-8 h-8"/>
                   </div>
                 </div>
-                <h3 className="text-xl font-semibold text-foreground/80">No attendance records yet.</h3>
-                <p className="text-sm text-muted-foreground mt-1">Workers can sign in using the QR code scanner.</p>
+                <h3 className="text-lg md:text-xl font-semibold text-foreground/80">No attendance records yet.</h3>
+                <p className="text-sm text-muted-foreground mt-1 px-2">Workers can sign in using the QR code scanner.</p>
             </div>
           )}
         </div>
