@@ -29,19 +29,14 @@ export default function AttendancePage() {
     }
   }, [router, toast]);
 
-  const handleAddRecord = (data: { workerId: string; pin: string; notes: string; }) => {
-    const worker = workers.find(w => w.id === data.workerId);
+  const handleAddRecord = (data: { pin: string; notes: string; }) => {
+    const worker = workers.find(w => w.pin === data.pin);
 
     if (!worker) {
-        toast({ variant: "destructive", title: "Error", description: "Selected worker not found." });
-        return;
-    }
-    
-    if (worker.pin !== data.pin) {
         toast({ variant: "destructive", title: "Invalid PIN", description: "The PIN you entered is incorrect." });
         return;
     }
-
+    
     const newRecord: AttendanceRecord = {
       id: new Date().toISOString(),
       timestamp: new Date(),
@@ -75,7 +70,7 @@ export default function AttendancePage() {
         </Button>
       <main className="container mx-auto px-4 py-8 md:px-6 md:py-12 flex justify-center">
          <div className="w-full max-w-md">
-            <AttendancePinForm workers={workers} onSubmit={handleAddRecord} />
+            <AttendancePinForm onSubmit={handleAddRecord} />
         </div>
       </main>
     </div>

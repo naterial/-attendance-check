@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Worker } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters.").max(50),
@@ -35,6 +37,7 @@ interface AddWorkerFormProps {
 }
 
 export function AddWorkerForm({ onSubmit }: AddWorkerFormProps) {
+  const { toast } = useToast();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -46,6 +49,22 @@ export function AddWorkerForm({ onSubmit }: AddWorkerFormProps) {
   });
 
   const handleSubmit = (data: FormValues) => {
+    const existingWorkers: Worker[] = JSON.parse(localStorage.getItem('workers') || '[]');
+    const isPinTaken = existingWorkers.some(w => w.pin === data.pin);
+
+    if (isPinTaken) {
+      form.setError("pin", {
+        type: "manual",
+        message: "This PIN is already taken. Please choose another one.",
+      });
+      toast({
+        variant: "destructive",
+        title: "PIN Already Exists",
+        description: "Another worker is already using this PIN.",
+      });
+      return;
+    }
+
     onSubmit(data);
     form.reset();
   };
