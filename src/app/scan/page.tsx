@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -12,7 +13,7 @@ const TARGET_COORDINATES = {
     latitude: 37.7749, // Replace with Community Centre's Latitude
     longitude: -122.4194, // Replace with Community Centre's Longitude
 };
-const MAX_DISTANCE_METERS = 200; // Increased distance for testing
+const MAX_DISTANCE_METERS = 2; // Approx 6 feet for precise location check
 const QR_CODE_SECRET = "vibrant-aging-attendance-app:auth-v1";
 const QR_READER_ELEMENT_ID = "qr-reader";
 
@@ -231,3 +232,5 @@ export default function ScanPage() {
         </div>
     );
 }
+
+    
