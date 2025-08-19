@@ -19,7 +19,7 @@ const QR_READER_ELEMENT_ID = "qr-reader";
 export default function ScanPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const [status, setStatus] = useState('idle'); // idle, scanning, verifying, success, error
+    const [status, setStatus] = useState<'idle' | 'scanning' | 'verifying' | 'success' | 'error'>('idle'); 
     const [errorMessage, setErrorMessage] = useState('');
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
     const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -40,6 +40,7 @@ export default function ScanPage() {
 
     const handleScanSuccess = (decodedText: string) => {
         if (scannerRef.current?.getState() === Html5QrcodeScannerState.SCANNING) {
+            scannerRef.current.stop();
             if (decodedText === QR_CODE_SECRET) {
                 setStatus('verifying');
                 verifyLocation();
@@ -52,7 +53,7 @@ export default function ScanPage() {
     
     const handleScanError = (error: any) => {
       // This is called frequently, so we only log for debugging.
-      console.warn(`QR_READER_ERROR: ${error}`);
+      // console.warn(`QR_READER_ERROR: ${error}`);
     };
 
     const verifyLocation = () => {
@@ -71,7 +72,7 @@ export default function ScanPage() {
                         title: 'Verification Successful!',
                         description: 'Redirecting to the attendance form.',
                     });
-                    setTimeout(() => router.push('/attendance'), 1000);
+                    router.push('/attendance');
                 } else {
                     setStatus('error');
                     setErrorMessage(`You are too far from the centre. Please move closer and try again. Distance: ${Math.round(distance)}m`);
@@ -86,51 +87,59 @@ export default function ScanPage() {
     };
 
     useEffect(() => {
-        const requestCamera = async () => {
-            if (status !== 'scanning') return;
-
+        const startScanner = async () => {
+            if (status !== 'scanning' || hasCameraPermission !== true) return;
+    
+            const scanner = new Html5Qrcode(QR_READER_ELEMENT_ID, false);
+            scannerRef.current = scanner;
+    
             try {
-                // Check for cameras.
-                const cameras = await Html5Qrcode.getCameras();
-                if (!cameras || cameras.length === 0) {
-                    setHasCameraPermission(false);
-                    setErrorMessage("No camera found on this device.");
-                    setStatus('error');
-                    return;
-                }
-                setHasCameraPermission(true);
-
-                // Create and start scanner.
-                const scanner = new Html5Qrcode(QR_READER_ELEMENT_ID, false);
-                scannerRef.current = scanner;
-                
                 await scanner.start(
                     { facingMode: "environment" },
                     { 
                         fps: 10, 
                         qrbox: { width: 250, height: 250 },
+                        // supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
                     },
                     handleScanSuccess,
                     handleScanError
                 );
             } catch (err) {
-                console.error("Camera permission error:", err);
-                setHasCameraPermission(false);
-                setErrorMessage("Camera access was denied. Please enable camera permissions in your browser settings and refresh the page.");
-                setStatus('error');
+                 console.error("Scanner start error:", err);
+                 setStatus('error');
+                 setErrorMessage("Failed to start the camera. It might be in use by another application.");
             }
         };
 
-        requestCamera();
+        startScanner();
 
         return () => {
-            if (scannerRef.current && scannerRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
+            if (scannerRef.current && scannerRef.current.isScanning) {
                 scannerRef.current.stop().catch(e => console.error("Failed to stop scanner", e));
             }
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status]);
+    }, [status, hasCameraPermission]);
 
+
+    const requestCameraPermission = async () => {
+        setStatus('scanning');
+        try {
+            const cameras = await Html5Qrcode.getCameras();
+            if (cameras && cameras.length) {
+                setHasCameraPermission(true);
+            } else {
+                setHasCameraPermission(false);
+                setErrorMessage("No camera found on this device.");
+                setStatus('error');
+            }
+        } catch (err) {
+            console.error("Camera permission error:", err);
+            setHasCameraPermission(false);
+            setErrorMessage("Camera access was denied. Please enable camera permissions in your browser settings and refresh the page.");
+            setStatus('error');
+        }
+    };
 
     const renderContent = () => {
         switch (status) {
@@ -145,7 +154,7 @@ export default function ScanPage() {
             case 'success':
                  return (
                     <div className="flex flex-col items-center justify-center text-center p-8 h-full">
-                        <h2 className="text-2xl font-bold text-green-600">Success!</h2>
+                         <h2 className="text-2xl font-bold text-green-600">Success!</h2>
                         <p className="text-muted-foreground">Redirecting you now...</p>
                     </div>
                 );
@@ -169,7 +178,8 @@ export default function ScanPage() {
             case 'scanning':
             default:
                 if (hasCameraPermission === false) {
-                    return <div className="hidden" /> // Error state will handle display
+                     // Error state will handle display, but this prevents render flicker.
+                     return null;
                 }
                 return (
                     <div className="relative w-full h-full">
@@ -198,16 +208,12 @@ export default function ScanPage() {
                 <div className="bg-card rounded-xl shadow-lg overflow-hidden aspect-square flex items-center justify-center">
                     {status === 'idle' ? (
                         <div className="p-12 text-center flex flex-col items-center justify-center h-full">
-                             {hasCameraPermission === null && (
-                                <>
-                                    <Video className="w-16 h-16 text-primary mb-4" />
-                                    <h2 className="text-2xl font-bold mb-2">Ready to Scan</h2>
-                                    <p className="text-muted-foreground mb-6">Click below to start your camera.</p>
-                                    <Button size="lg" onClick={() => setStatus('scanning')}>
-                                        Start Scanning
-                                    </Button>
-                                </>
-                            )}
+                            <Video className="w-16 h-16 text-primary mb-4" />
+                            <h2 className="text-2xl font-bold mb-2">Ready to Scan</h2>
+                            <p className="text-muted-foreground mb-6">Click below to start your camera.</p>
+                            <Button size="lg" onClick={requestCameraPermission}>
+                                Start Scanning
+                            </Button>
                         </div>
                     ) : (
                         renderContent()
