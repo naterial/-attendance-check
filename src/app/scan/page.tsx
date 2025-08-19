@@ -7,13 +7,12 @@ import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Video, MapPin } from 'lucide-react';
+import { Loader2, ArrowLeft, Video, VideoOff } from 'lucide-react';
 
 const QR_CODE_SECRET = "vibrant-aging-attendance-app:auth-v1";
 const QR_READER_ELEMENT_ID = "qr-reader";
-const MAX_ALLOWED_DISTANCE_METERS = 5; 
+const MAX_ALLOWED_DISTANCE_METERS = 5;
 
-// Haversine formula to calculate distance between two lat/lon points
 const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3; // metres
     const φ1 = lat1 * Math.PI / 180;
@@ -29,37 +28,58 @@ const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: num
     return R * c;
 };
 
+
 export default function ScanPage() {
     const router = useRouter();
     const { toast } = useToast();
-    const [status, setStatus] = useState<'idle' | 'scanning' | 'verifying' | 'success' | 'error'>('idle');
+    const [status, setStatus] = useState<'idle' | 'scanning' | 'verifying' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
     const scannerRef = useRef<Html5Qrcode | null>(null);
+    const readerRef = useRef<HTMLDivElement>(null);
 
     const cleanupScanner = async () => {
         if (scannerRef.current && scannerRef.current.isScanning) {
             try {
                 await scannerRef.current.stop();
             } catch (e) {
-                console.error("Failed to stop scanner cleanly:", e);
+                console.warn("Scanner already stopped or failed to stop.", e);
             }
         }
+        scannerRef.current = null;
     };
+    
+    // This effect handles the cleanup of the scanner when the component unmounts or the status changes.
+    useEffect(() => {
+        return () => {
+            cleanupScanner();
+        };
+    }, []);
 
-    const handleVerification = () => {
+    const handleScanSuccess = async (decodedText: string) => {
+        if (scannerRef.current?.getState() !== Html5QrcodeScannerState.SCANNING) {
+            return;
+        }
+
         setStatus('verifying');
+        await cleanupScanner();
+
+        if (decodedText !== QR_CODE_SECRET) {
+            setErrorMessage("Invalid QR Code. Please scan the official QR code.");
+            setStatus('error');
+            return;
+        }
 
         const storedLocation = localStorage.getItem('centerLocation');
         if (!storedLocation) {
-            setStatus('error');
             setErrorMessage("The center's location has not been set by an admin yet.");
+            setStatus('error');
             return;
         }
         const centerLocation = JSON.parse(storedLocation);
 
         if (!navigator.geolocation) {
-            setStatus('error');
             setErrorMessage("Geolocation is not supported by your browser.");
+            setStatus('error');
             return;
         }
 
@@ -67,91 +87,72 @@ export default function ScanPage() {
             (position) => {
                 const userLat = position.coords.latitude;
                 const userLon = position.coords.longitude;
-
                 const distance = getDistanceInMeters(userLat, userLon, centerLocation.lat, centerLocation.lon);
-
+                
                 if (distance <= MAX_ALLOWED_DISTANCE_METERS) {
-                    setStatus('success');
                     toast({
                         title: 'Location Verified!',
                         description: 'Redirecting to the attendance form.',
                     });
                     router.push('/attendance');
                 } else {
-                    setStatus('error');
                     setErrorMessage(`You are too far from the centre. Please move closer and try again. Distance: ${Math.round(distance)}m`);
+                    setStatus('error');
                 }
             },
             (error) => {
-                setStatus('error');
                 setErrorMessage(`Could not get your location: ${error.message}`);
+                setStatus('error');
             },
-            { enableHighAccuracy: true }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     };
 
-    const handleScanSuccess = async (decodedText: string) => {
-        if (scannerRef.current?.getState() === Html5QrcodeScannerState.SCANNING) {
-            await cleanupScanner();
-            if (decodedText === QR_CODE_SECRET) {
-                handleVerification();
-            } else {
-                setStatus('error');
-                setErrorMessage("Invalid QR Code. Please scan the official QR code.");
-            }
-        }
-    };
-    
     const handleScanError = (error: any) => {
-      // This is called frequently, so we only log for debugging.
-      // console.warn(`QR_READER_ERROR: ${error}`);
+        // This is called frequently, only act on critical errors
     };
-    
-    useEffect(() => {
-        const startScanner = async () => {
-            if (!document.getElementById(QR_READER_ELEMENT_ID)) return;
-            
-            const scanner = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
-            scannerRef.current = scanner;
 
-            try {
-                 await scanner.start(
-                    { facingMode: "environment" },
-                    { 
-                        fps: 10, 
-                        qrbox: (viewfinderWidth, viewfinderHeight) => {
-                            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                            const qrboxSize = Math.floor(minEdge * 0.7);
-                            return { width: qrboxSize, height: qrboxSize };
-                        },
-                    },
-                    handleScanSuccess,
-                    handleScanError
-                );
-            } catch (err: any) {
+    const startScanner = async () => {
+        if (scannerRef.current || !readerRef.current) return;
+        
+        setStatus('scanning');
+        setErrorMessage('');
+
+        const newScanner = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
+        scannerRef.current = newScanner;
+
+        try {
+            const cameras = await Html5Qrcode.getCameras();
+            if (!cameras || cameras.length === 0) {
+                 setErrorMessage("No camera found on this device.");
                  setStatus('error');
-                 if (err.name === 'NotAllowedError') {
-                    setErrorMessage("Camera access was denied. Please enable camera permissions and try again.");
-                 } else {
-                    setErrorMessage(`Failed to start camera. ${err.message || 'Please try again.'}`);
-                 }
+                 return;
             }
-        };
-
-        if (status === 'scanning') {
-            startScanner();
+            
+            await newScanner.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: (viewfinderWidth, viewfinderHeight) => {
+                        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                        const qrboxSize = Math.floor(minEdge * 0.75);
+                        return { width: qrboxSize, height: qrboxSize };
+                    },
+                },
+                handleScanSuccess,
+                handleScanError
+            );
+        } catch (err: any) {
+             if (err.name === 'NotAllowedError') {
+                setErrorMessage("Camera access was denied. Please enable camera permissions in your browser settings and try again.");
+             } else {
+                setErrorMessage(`Failed to start camera: ${err.message || 'Unknown error'}`);
+             }
+             setStatus('error');
+             await cleanupScanner();
         }
-
-        return () => {
-            cleanupScanner();
-        };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status]);
-
-
-    const requestCameraAndStart = () => {
-       setStatus('scanning');
     };
+
 
     const renderContent = () => {
         switch (status) {
@@ -163,13 +164,6 @@ export default function ScanPage() {
                         <p className="text-muted-foreground">Please wait a moment.</p>
                     </div>
                 );
-            case 'success':
-                 return (
-                    <div className="flex flex-col items-center justify-center text-center p-8 h-full">
-                         <h2 className="text-2xl font-bold text-green-600">Success!</h2>
-                        <p className="text-muted-foreground">Redirecting you now...</p>
-                    </div>
-                );
             case 'error':
                 return (
                     <div className="text-center p-8 flex flex-col justify-center items-center h-full">
@@ -177,10 +171,7 @@ export default function ScanPage() {
                             <AlertTitle>Error</AlertTitle>
                             <AlertDescription>{errorMessage}</AlertDescription>
                         </Alert>
-                        <Button onClick={() => {
-                            setErrorMessage('');
-                            setStatus('idle');
-                        }}>
+                        <Button onClick={() => setStatus('idle')}>
                             Try Again
                         </Button>
                     </div>
@@ -188,9 +179,9 @@ export default function ScanPage() {
             case 'scanning':
                 return (
                     <div className="relative w-full h-full bg-black">
-                       <div id={QR_READER_ELEMENT_ID} className="w-full h-full" />
+                       <div id={QR_READER_ELEMENT_ID} ref={readerRef} className="w-full h-full" />
                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-[250px] h-[250px] border-4 border-primary/80 rounded-lg shadow-inner" />
+                            <div className="w-[70vw] h-[70vw] max-w-[300px] max-h-[300px] border-4 border-primary/80 rounded-lg shadow-inner" />
                        </div>
                        <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/80 text-xs bg-black/50 px-2 py-1 rounded">
                            Align QR code within the box
@@ -203,8 +194,8 @@ export default function ScanPage() {
                     <div className="p-12 text-center flex flex-col items-center justify-center h-full">
                         <Video className="w-16 h-16 text-primary mb-4" />
                         <h2 className="text-2xl font-bold mb-2">Ready to Scan</h2>
-                        <p className="text-muted-foreground mb-6">Press the button to start the camera.</p>
-                        <Button size="lg" onClick={requestCameraAndStart}>
+                        <p className="text-muted-foreground mb-6">Press the button to start the camera and scan the QR code for attendance.</p>
+                        <Button size="lg" onClick={startScanner}>
                             Start Camera
                         </Button>
                     </div>

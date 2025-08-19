@@ -103,7 +103,8 @@ export default function AdminPage() {
                     description: error.message,
                 });
                 setIsSettingLocation(false);
-            }
+            },
+            { enableHighAccuracy: true }
         );
     };
 
