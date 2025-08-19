@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, CameraOff } from 'lucide-react';
+import { Loader2, ArrowLeft, CameraOff, Video } from 'lucide-react';
 
 const TARGET_COORDINATES = {
     latitude: 37.7749, // Replace with Community Centre's Latitude
@@ -21,7 +21,8 @@ export default function ScanPage() {
     const { toast } = useToast();
     const [status, setStatus] = useState('idle'); // idle, scanning, verifying, success, error
     const [errorMessage, setErrorMessage] = useState('');
-    const [hasCameraPermission, setHasCameraPermission] = useState(true);
+    const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+    const scannerRef = useRef<Html5Qrcode | null>(null);
 
     const getDistance = (coords1: GeolocationCoordinates, coords2: { latitude: number, longitude: number }) => {
         const toRad = (x: number) => x * Math.PI / 180;
@@ -38,7 +39,7 @@ export default function ScanPage() {
     };
 
     const handleScanSuccess = (decodedText: string) => {
-        if (status === 'scanning') {
+        if (scannerRef.current?.getState() === Html5QrcodeScannerState.SCANNING) {
             if (decodedText === QR_CODE_SECRET) {
                 setStatus('verifying');
                 verifyLocation();
@@ -50,11 +51,7 @@ export default function ScanPage() {
     };
     
     const handleScanError = (error: any) => {
-      // The library calls this often, even when just searching for a QR code.
-      // We are only concerned with permission errors here.
-      if (typeof error === 'string' && (error.includes('NotAllowedError') || error.includes('NotFoundError'))) {
-        setHasCameraPermission(false);
-      }
+      // This is called frequently, so we only log for debugging.
       console.warn(`QR_READER_ERROR: ${error}`);
     };
 
@@ -89,35 +86,51 @@ export default function ScanPage() {
     };
 
     useEffect(() => {
-      if (status !== 'scanning' || !hasCameraPermission) return;
-  
-      const scanner = new Html5QrcodeScanner(
-          QR_READER_ELEMENT_ID,
-          { 
-            fps: 10, 
-            qrbox: { width: 250, height: 250 },
-            supportedScanTypes: [] // Use all supported scan types.
-          },
-          /* verbose= */ false
-      );
-  
-      scanner.render(handleScanSuccess, handleScanError);
-  
-      return () => {
-        // Cleanup on component unmount
-        if (scanner) {
-          try {
-            // Check if scanning is in progress before clearing
-            if (scanner.getState() === 2) { // 2 is SCANNING state
-                 scanner.clear();
+        const requestCamera = async () => {
+            if (status !== 'scanning') return;
+
+            try {
+                // Check for cameras.
+                const cameras = await Html5Qrcode.getCameras();
+                if (!cameras || cameras.length === 0) {
+                    setHasCameraPermission(false);
+                    setErrorMessage("No camera found on this device.");
+                    setStatus('error');
+                    return;
+                }
+                setHasCameraPermission(true);
+
+                // Create and start scanner.
+                const scanner = new Html5Qrcode(QR_READER_ELEMENT_ID, false);
+                scannerRef.current = scanner;
+                
+                await scanner.start(
+                    { facingMode: "environment" },
+                    { 
+                        fps: 10, 
+                        qrbox: { width: 250, height: 250 },
+                    },
+                    handleScanSuccess,
+                    handleScanError
+                );
+            } catch (err) {
+                console.error("Camera permission error:", err);
+                setHasCameraPermission(false);
+                setErrorMessage("Camera access was denied. Please enable camera permissions in your browser settings and refresh the page.");
+                setStatus('error');
             }
-          } catch(e) {
-            console.error("Failed to clear scanner", e);
-          }
-        }
-      };
+        };
+
+        requestCamera();
+
+        return () => {
+            if (scannerRef.current && scannerRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
+                scannerRef.current.stop().catch(e => console.error("Failed to stop scanner", e));
+            }
+        };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [status, hasCameraPermission]);
+    }, [status]);
+
 
     const renderContent = () => {
         switch (status) {
@@ -140,12 +153,14 @@ export default function ScanPage() {
                 return (
                     <div className="text-center p-8 flex flex-col justify-center items-center h-full">
                         <Alert variant="destructive" className="mb-6">
+                            <CameraOff className="w-6 h-6 mr-2"/>
                             <AlertTitle>Error</AlertTitle>
                             <AlertDescription>{errorMessage}</AlertDescription>
                         </Alert>
                         <Button onClick={() => {
                             setErrorMessage('');
-                            setStatus('scanning');
+                            setHasCameraPermission(null);
+                            setStatus('idle');
                         }}>
                             Try Again
                         </Button>
@@ -153,18 +168,17 @@ export default function ScanPage() {
                 );
             case 'scanning':
             default:
-                if (!hasCameraPermission) {
-                     return (
-                         <div className="text-center p-8 flex flex-col justify-center items-center h-full">
-                            <Alert variant="destructive">
-                                <CameraOff className="w-6 h-6 mr-2"/>
-                                <AlertTitle>Camera Access Denied</AlertTitle>
-                                <AlertDescription>Please enable camera permissions in your browser settings to use the scanner.</AlertDescription>
-                            </Alert>
-                         </div>
-                     )
+                if (hasCameraPermission === false) {
+                    return <div className="hidden" /> // Error state will handle display
                 }
-                return <div id={QR_READER_ELEMENT_ID} className="w-full h-full" />;
+                return (
+                    <div className="relative w-full h-full">
+                       <div id={QR_READER_ELEMENT_ID} className="w-full h-full" />
+                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-[250px] h-[250px] border-4 border-primary/50 rounded-lg shadow-inner" />
+                       </div>
+                    </div>
+                );
         }
     };
 
@@ -181,12 +195,19 @@ export default function ScanPage() {
                     <p className="text-muted-foreground">Point your camera at the QR code to begin.</p>
                 </div>
                 
-                <div className="bg-card rounded-xl shadow-lg overflow-hidden aspect-square">
+                <div className="bg-card rounded-xl shadow-lg overflow-hidden aspect-square flex items-center justify-center">
                     {status === 'idle' ? (
-                        <div className="p-12 text-center flex items-center justify-center h-full">
-                            <Button size="lg" onClick={() => setStatus('scanning')}>
-                                Start Scanning
-                            </Button>
+                        <div className="p-12 text-center flex flex-col items-center justify-center h-full">
+                             {hasCameraPermission === null && (
+                                <>
+                                    <Video className="w-16 h-16 text-primary mb-4" />
+                                    <h2 className="text-2xl font-bold mb-2">Ready to Scan</h2>
+                                    <p className="text-muted-foreground mb-6">Click below to start your camera.</p>
+                                    <Button size="lg" onClick={() => setStatus('scanning')}>
+                                        Start Scanning
+                                    </Button>
+                                </>
+                            )}
                         </div>
                     ) : (
                         renderContent()
