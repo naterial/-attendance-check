@@ -44,17 +44,23 @@ export default function ScanPage() {
             const onScanSuccess = async (decodedText: string) => {
                 if (isProcessing) return;
                 setIsProcessing(true);
-                await html5Qrcode.stop();
+                
+                // It's safer to stop the scanner immediately after a scan is detected
+                if (scannerRef.current && scannerRef.current.isScanning) {
+                    await scannerRef.current.stop();
+                }
 
                 if (decodedText !== QR_CODE_SECRET) {
                     setErrorMessage("Invalid QR Code. Please scan the official attendance code.");
+                    setIsProcessing(false);
                     return;
                 }
 
                 try {
                     const centerLocation = await getCenterLocation();
-                    if (!centerLocation || !centerLocation.lat) {
+                    if (!centerLocation || !centerLocation.lat || !centerLocation.radius) {
                         setErrorMessage("Center location not set. An admin must set it first.");
+                        setIsProcessing(false);
                         return;
                     }
 
@@ -72,15 +78,18 @@ export default function ScanPage() {
                                 router.push('/attendance');
                             } else {
                                 setErrorMessage(`You are too far from the centre. Distance: ${Math.round(distance)}m. Required: within ${centerLocation.radius}m.`);
+                                setIsProcessing(false);
                             }
                         },
                         (geoError) => {
                             setErrorMessage(`Could not get location: ${geoError.message}. Please enable location services.`);
+                            setIsProcessing(false);
                         },
                         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                     );
                 } catch (dbError: any) {
                     setErrorMessage(`Database error: ${dbError.message}`);
+                    setIsProcessing(false);
                 }
             };
             
