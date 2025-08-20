@@ -14,7 +14,7 @@ import {
     setDoc,
     getDoc
 } from 'firebase/firestore';
-import type { Worker, AttendanceRecord, Shift, WorkerRole } from './types';
+import type { Worker, AttendanceRecord, Shift, WorkerRole, CenterLocation } from './types';
 
 // Type helper to convert Firestore Timestamps to Dates
 const fromFirestore = <T extends { timestamp?: Timestamp }>(docData: T): Omit<T, 'timestamp'> & { timestamp: Date } => {
@@ -81,14 +81,24 @@ export const getAttendanceRecords = async (): Promise<AttendanceRecord[]> => {
 };
 
 // Center Location Functions
-export const setCenterLocation = async (location: { lat: number, lon: number }): Promise<void> => {
+export const setCenterLocation = async (location: Omit<CenterLocation, 'updatedAt'>): Promise<void> => {
     const locationRef = doc(db, 'config', 'centerLocation');
-    // Use setDoc with merge to create the document if it doesn't exist, or update it if it does.
-    await setDoc(locationRef, location, { merge: true });
+    const locationWithTimestamp = {
+        ...location,
+        updatedAt: Timestamp.now()
+    }
+    await setDoc(locationRef, locationWithTimestamp, { merge: true });
 };
 
-export const getCenterLocation = async (): Promise<{ lat: number; lon: number } | null> => {
+export const getCenterLocation = async (): Promise<CenterLocation | null> => {
     const locationRef = doc(db, 'config', 'centerLocation');
     const docSnap = await getDoc(locationRef);
-    return docSnap.exists() ? docSnap.data() as { lat: number; lon: number } : null;
+    if (!docSnap.exists()) {
+        return null;
+    }
+    const data = docSnap.data();
+    return {
+        ...data,
+        updatedAt: (data.updatedAt as Timestamp).toDate()
+    } as CenterLocation;
 };

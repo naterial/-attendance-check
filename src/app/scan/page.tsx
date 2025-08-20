@@ -12,7 +12,6 @@ import { getCenterLocation } from '@/lib/firestore';
 
 const QR_CODE_SECRET = "vibrant-aging-attendance-app:auth-v1";
 const QR_READER_ELEMENT_ID = "qr-reader";
-const MAX_ALLOWED_DISTANCE_METERS = 5;
 
 const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3; // metres
@@ -89,14 +88,14 @@ export default function ScanPage() {
                     const userLon = position.coords.longitude;
                     const distance = getDistanceInMeters(userLat, userLon, centerLocation.lat, centerLocation.lon);
                     
-                    if (distance <= MAX_ALLOWED_DISTANCE_METERS) {
+                    if (distance <= centerLocation.radius) {
                         toast({
                             title: 'Location Verified!',
                             description: 'Redirecting to the attendance form.',
                         });
                         router.push('/attendance');
                     } else {
-                        setErrorMessage(`You are too far from the centre. Please move closer and try again. Distance: ${Math.round(distance)}m`);
+                        setErrorMessage(`You are too far from the centre. Please move closer and try again. Distance: ${Math.round(distance)}m. Required: ${centerLocation.radius}m`);
                         setStatus('error');
                     }
                 },

@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { Worker, AttendanceRecord } from '@/lib/types';
+import type { Worker, AttendanceRecord, CenterLocation } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { AddWorkerForm } from '@/components/add-worker-form';
@@ -25,7 +25,7 @@ export default function AdminPage() {
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [isAddWorkerOpen, setAddWorkerOpen] = useState(false);
     const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
-    const [centerLocation, setCenterLocation] = useState<{ lat: number; lon: number } | null>(null);
+    const [centerLocation, setCenterLocation] = useState<CenterLocation | null>(null);
     const [isSettingLocation, setIsSettingLocation] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -120,10 +120,12 @@ export default function AdminPage() {
                 const newLocation = {
                     lat: position.coords.latitude,
                     lon: position.coords.longitude,
+                    radius: 5, // Default radius in meters
                 };
                 try {
                     await setFirestoreLocation(newLocation);
-                    setCenterLocation(newLocation);
+                    const fetchedLocation = await getCenterLocation();
+                    setCenterLocation(fetchedLocation);
                     toast({
                         title: 'Location Set!',
                         description: 'The new center location has been saved.',
@@ -250,6 +252,8 @@ export default function AdminPage() {
                             <div className="text-sm text-muted-foreground p-2 rounded-md bg-muted">
                                 <p className="font-semibold">Current Location Set:</p>
                                 <p>Lat: {centerLocation.lat.toFixed(6)}, Lon: {centerLocation.lon.toFixed(6)}</p>
+                                <p>Radius: {centerLocation.radius} meters</p>
+                                <p className="text-xs mt-1">Last Updated: {format(centerLocation.updatedAt, 'PPP p')}</p>
                             </div>
                         ) : (
                             <p className="text-sm text-destructive-foreground p-2 rounded-md bg-destructive/80">No location has been set yet.</p>

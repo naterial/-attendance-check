@@ -18,3 +18,10 @@ export interface AttendanceRecord {
   notes: string;
   timestamp: Date;
 }
+
+export interface CenterLocation {
+  lat: number;
+  lon: number;
+  radius: number;
+  updatedAt: Date;
+}
