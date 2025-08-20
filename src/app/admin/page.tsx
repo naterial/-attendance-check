@@ -120,7 +120,7 @@ export default function AdminPage() {
                 const newLocation = {
                     lat: position.coords.latitude,
                     lon: position.coords.longitude,
-                    radius: 5, // Default radius in meters
+                    radius: 100, // Default radius in meters
                 };
                 try {
                     await setFirestoreLocation(newLocation);
@@ -368,6 +368,5 @@ export default function AdminPage() {
             )}
         </div>
     );
-}
 
     
