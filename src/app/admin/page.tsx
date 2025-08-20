@@ -248,12 +248,14 @@ export default function AdminPage() {
                             {isSettingLocation ? <Loader2 className="mr-2 animate-spin" /> : <MapPin className="mr-2" />}
                             {isSettingLocation ? 'Fetching...' : 'Set Current Location as Center'}
                         </Button>
-                        {centerLocation ? (
+                        {centerLocation && centerLocation.lat ? (
                             <div className="text-sm text-muted-foreground p-2 rounded-md bg-muted">
                                 <p className="font-semibold">Current Location Set:</p>
                                 <p>Lat: {centerLocation.lat.toFixed(6)}, Lon: {centerLocation.lon.toFixed(6)}</p>
                                 <p>Radius: {centerLocation.radius} meters</p>
-                                <p className="text-xs mt-1">Last Updated: {format(centerLocation.updatedAt, 'PPP p')}</p>
+                                {centerLocation.updatedAt && (
+                                  <p className="text-xs mt-1">Last Updated: {format(centerLocation.updatedAt, 'PPP p')}</p>
+                                )}
                             </div>
                         ) : (
                             <p className="text-sm text-destructive-foreground p-2 rounded-md bg-destructive/80">No location has been set yet.</p>
@@ -367,3 +369,5 @@ export default function AdminPage() {
         </div>
     );
 }
+
+    
