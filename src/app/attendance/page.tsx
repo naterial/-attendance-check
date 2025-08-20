@@ -16,7 +16,7 @@ export default function AttendancePage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleAddRecord = async (data: { pin: string; notes: string; }) => {
+  const handleAddRecord = async (data: { pin: string; notes?: string; }) => {
     setIsLoading(true);
     try {
         const worker = await getWorkerByPin(data.pin);
@@ -33,7 +33,7 @@ export default function AttendancePage() {
           name: worker.name,
           role: worker.role,
           shift: worker.shift,
-          notes: data.notes,
+          notes: data.notes || '',
         };
         
         await addAttendanceRecord(newRecord);

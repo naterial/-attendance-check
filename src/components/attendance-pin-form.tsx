@@ -20,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const formSchema = z.object({
   pin: z.string().length(4, "PIN must be 4 digits.").regex(/^\d{4}$/, "PIN must be numeric."),
-  notes: z.string().min(5, "Notes must be at least 5 characters.").max(500),
+  notes: z.string().max(500, "Notes cannot be longer than 500 characters.").optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -47,7 +47,7 @@ export function AttendancePinForm({ onSubmit }: AttendancePinFormProps) {
     <Card className="w-full shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline">Mark Attendance</CardTitle>
-        <CardDescription>Enter your secret PIN and leave a note for the day.</CardDescription>
+        <CardDescription>Enter your secret PIN and optionally leave a note for the day.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -70,7 +70,7 @@ export function AttendancePinForm({ onSubmit }: AttendancePinFormProps) {
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>Notes (Optional)</FormLabel>
                   <FormControl>
                     <Textarea placeholder="Any notes for today's session?" className="resize-none h-28" {...field} />
                   </FormControl>
