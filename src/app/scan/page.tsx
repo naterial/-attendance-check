@@ -32,12 +32,10 @@ export default function ScanPage() {
     const [scanState, setScanState] = useState<'idle' | 'scanning' | 'processing' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
     const scannerRef = useRef<Html5Qrcode | null>(null);
-    const readerRef = useRef<HTMLDivElement>(null);
 
     const cleanupScanner = useCallback(async () => {
         if (scannerRef.current) {
             const scanner = scannerRef.current;
-            scannerRef.current = null;
             if (scanner.isScanning) {
                 try {
                     await scanner.stop();
@@ -45,6 +43,7 @@ export default function ScanPage() {
                     console.warn("Error stopping scanner:", e);
                 }
             }
+            scannerRef.current = null;
         }
     }, []);
 
@@ -55,38 +54,33 @@ export default function ScanPage() {
     }, [cleanupScanner]);
 
     const startScanner = useCallback(async () => {
-        if (scannerRef.current || !readerRef.current) return;
-
+        if (scannerRef.current) return;
+    
         setScanState('scanning');
         setErrorMessage('');
-
+    
         try {
             const newScanner = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
             scannerRef.current = newScanner;
-
+    
             await newScanner.start(
                 { facingMode: "environment" },
                 {
                     fps: 10,
-                    qrbox: (viewfinderWidth, viewfinderHeight) => {
-                        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                        const qrboxSize = Math.floor(minEdge * 0.8);
-                        return { width: qrboxSize, height: qrboxSize };
-                    },
-                    aspectRatio: 1.0,
+                    qrbox: { width: 250, height: 250 },
                 },
                 async (decodedText) => {
                     // --- Scan Success ---
-                    if (scannerRef.current) {
+                    if (scanState === 'scanning') {
                         setScanState('processing');
                         await cleanupScanner();
-
+    
                         if (decodedText !== QR_CODE_SECRET) {
                             setErrorMessage("Invalid QR Code. Please scan the official attendance code.");
                             setScanState('error');
                             return;
                         }
-
+    
                         // Verify Location
                         try {
                             const centerLocation = await getCenterLocation();
@@ -95,7 +89,7 @@ export default function ScanPage() {
                                 setScanState('error');
                                 return;
                             }
-
+    
                             navigator.geolocation.getCurrentPosition(
                                 (position) => {
                                     const distance = getDistanceFromLatLonInM(
@@ -104,7 +98,7 @@ export default function ScanPage() {
                                         centerLocation.lat,
                                         centerLocation.lon
                                     );
-
+    
                                     if (distance <= centerLocation.radius) {
                                         toast({ title: 'Location Verified!', description: 'Redirecting to attendance form.' });
                                         router.push('/attendance');
@@ -133,12 +127,14 @@ export default function ScanPage() {
             let message = `Failed to start camera: ${err.message || 'Unknown error'}`;
             if (err.name === 'NotAllowedError') {
                 message = "Camera access was denied. Please enable camera permissions in browser settings.";
+            } else if (err.name === 'NotFoundError') {
+                 message = "No camera found on this device.";
             }
             setErrorMessage(message);
             setScanState('error');
             await cleanupScanner();
         }
-    }, [cleanupScanner, router, toast]);
+    }, [cleanupScanner, router, toast, scanState]);
 
     const renderContent = () => {
         switch (scanState) {
@@ -165,7 +161,7 @@ export default function ScanPage() {
             case 'scanning':
                 return (
                     <div className="relative w-full h-full bg-black">
-                       <div id={QR_READER_ELEMENT_ID} ref={readerRef} className="w-full h-full" />
+                       <div id={QR_READER_ELEMENT_ID} className="w-full h-full" />
                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="w-[70vw] h-[70vw] max-w-[300px] max-h-[300px] border-4 border-primary/80 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]" />
                        </div>
