@@ -45,7 +45,6 @@ export default function ScanPage() {
                 if (isProcessing) return;
                 setIsProcessing(true);
                 
-                // It's safer to stop the scanner immediately after a scan is detected
                 if (scannerRef.current && scannerRef.current.isScanning) {
                     await scannerRef.current.stop();
                 }
@@ -58,7 +57,7 @@ export default function ScanPage() {
 
                 try {
                     const centerLocation = await getCenterLocation();
-                    if (!centerLocation || !centerLocation.lat || !centerLocation.radius) {
+                    if (!centerLocation || !centerLocation.lat || !centerLocation.lon || !centerLocation.radius) {
                         setErrorMessage("Center location not set. An admin must set it first.");
                         setIsProcessing(false);
                         return;
