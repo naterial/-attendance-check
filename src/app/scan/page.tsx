@@ -11,7 +11,7 @@ import { Loader2, ArrowLeft, Video, VideoOff } from 'lucide-react';
 import { getCenterLocation } from '@/lib/firestore';
 
 const QR_CODE_SECRET = "vibrant-aging-attendance-app:auth-v1";
-const QR_READER_ELEMENT_ID = "qr-reader";
+const QR_READER_ELEMENT_ID = "qr-reader-video";
 
 // Haversine formula for distance calculation
 const getDistanceFromLatLonInM = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -31,7 +31,9 @@ export default function ScanPage() {
     const { toast } = useToast();
     const [scanState, setScanState] = useState<'idle' | 'scanning' | 'processing' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
+    const [hasCameraPermission, setHasCameraPermission] = useState(false);
     const scannerRef = useRef<Html5Qrcode | null>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
 
     const cleanupScanner = useCallback(async () => {
         if (scannerRef.current) {
@@ -48,13 +50,48 @@ export default function ScanPage() {
     }, []);
 
     useEffect(() => {
+        const getCameraPermission = async () => {
+            try {
+                // Ensure there's a navigator object
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    setErrorMessage("Camera not supported on this browser.");
+                    setScanState('error');
+                    return;
+                }
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                setHasCameraPermission(true);
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    videoRef.current.play();
+                }
+            } catch (error: any) {
+                console.error('Error accessing camera:', error);
+                setHasCameraPermission(false);
+                let message = `Failed to start camera: ${error.message || 'Unknown error'}`;
+                if (error.name === 'NotAllowedError') {
+                    message = "Camera access was denied. Please enable camera permissions in browser settings.";
+                } else if (error.name === 'NotFoundError') {
+                     message = "No suitable camera found on this device.";
+                }
+                setErrorMessage(message);
+                setScanState('error');
+            }
+        };
+
+        getCameraPermission();
+        
+        // Cleanup function
         return () => {
             cleanupScanner();
+            if (videoRef.current && videoRef.current.srcObject) {
+                const stream = videoRef.current.srcObject as MediaStream;
+                stream.getTracks().forEach(track => track.stop());
+            }
         };
     }, [cleanupScanner]);
 
     const startScanner = useCallback(async () => {
-        if (scannerRef.current) return;
+        if (scannerRef.current || !videoRef.current) return;
     
         setScanState('scanning');
         setErrorMessage('');
@@ -62,75 +99,69 @@ export default function ScanPage() {
         try {
             const newScanner = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
             scannerRef.current = newScanner;
-    
+
+            const onScanSuccess = async (decodedText: string) => {
+                if (scanState === 'scanning') {
+                    setScanState('processing');
+                    await cleanupScanner();
+
+                    if (decodedText !== QR_CODE_SECRET) {
+                        setErrorMessage("Invalid QR Code. Please scan the official attendance code.");
+                        setScanState('error');
+                        return;
+                    }
+
+                    try {
+                        const centerLocation = await getCenterLocation();
+                        if (!centerLocation) {
+                            setErrorMessage("Center location not set. An admin must set it first.");
+                            setScanState('error');
+                            return;
+                        }
+
+                        navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                                const distance = getDistanceFromLatLonInM(
+                                    position.coords.latitude,
+                                    position.coords.longitude,
+                                    centerLocation.lat,
+                                    centerLocation.lon
+                                );
+
+                                if (distance <= centerLocation.radius) {
+                                    toast({ title: 'Location Verified!', description: 'Redirecting to attendance form.' });
+                                    router.push('/attendance');
+                                } else {
+                                    setErrorMessage(`You are too far from the centre. Distance: ${Math.round(distance)}m. Required: within ${centerLocation.radius}m.`);
+                                    setScanState('error');
+                                }
+                            },
+                            (geoError) => {
+                                setErrorMessage(`Could not get location: ${geoError.message}. Please enable location services.`);
+                                setScanState('error');
+                            },
+                            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                        );
+                    } catch (dbError: any) {
+                        setErrorMessage(`Database error: ${dbError.message}`);
+                        setScanState('error');
+                    }
+                }
+            };
+            
+            // Attach scanner to the existing video element
             await newScanner.start(
-                { facingMode: "environment" },
+                QR_READER_ELEMENT_ID,
                 {
                     fps: 10,
                     qrbox: { width: 250, height: 250 },
                 },
-                async (decodedText) => {
-                    // --- Scan Success ---
-                    if (scanState === 'scanning') {
-                        setScanState('processing');
-                        await cleanupScanner();
-    
-                        if (decodedText !== QR_CODE_SECRET) {
-                            setErrorMessage("Invalid QR Code. Please scan the official attendance code.");
-                            setScanState('error');
-                            return;
-                        }
-    
-                        // Verify Location
-                        try {
-                            const centerLocation = await getCenterLocation();
-                            if (!centerLocation) {
-                                setErrorMessage("Center location not set. An admin must set it first.");
-                                setScanState('error');
-                                return;
-                            }
-    
-                            navigator.geolocation.getCurrentPosition(
-                                (position) => {
-                                    const distance = getDistanceFromLatLonInM(
-                                        position.coords.latitude,
-                                        position.coords.longitude,
-                                        centerLocation.lat,
-                                        centerLocation.lon
-                                    );
-    
-                                    if (distance <= centerLocation.radius) {
-                                        toast({ title: 'Location Verified!', description: 'Redirecting to attendance form.' });
-                                        router.push('/attendance');
-                                    } else {
-                                        setErrorMessage(`You are too far from the centre. Distance: ${Math.round(distance)}m. Required: within ${centerLocation.radius}m.`);
-                                        setScanState('error');
-                                    }
-                                },
-                                (geoError) => {
-                                    setErrorMessage(`Could not get location: ${geoError.message}. Please enable location services.`);
-                                    setScanState('error');
-                                },
-                                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                            );
-                        } catch (dbError: any) {
-                            setErrorMessage(`Database error: ${dbError.message}`);
-                            setScanState('error');
-                        }
-                    }
-                },
-                (scanError) => { 
-                    // This callback is called frequently, ignore non-critical errors.
-                }
+                onScanSuccess,
+                (scanError) => { /* This callback is called frequently, ignore non-critical errors. */ }
             );
+
         } catch (err: any) {
-            let message = `Failed to start camera: ${err.message || 'Unknown error'}`;
-            if (err.name === 'NotAllowedError') {
-                message = "Camera access was denied. Please enable camera permissions in browser settings.";
-            } else if (err.name === 'NotFoundError') {
-                 message = "No camera found on this device.";
-            }
-            setErrorMessage(message);
+            setErrorMessage(`Failed to start scanner: ${err.message || 'Unknown error'}`);
             setScanState('error');
             await cleanupScanner();
         }
@@ -142,7 +173,7 @@ export default function ScanPage() {
                 return (
                     <div className="flex flex-col items-center justify-center p-8 h-full">
                         <Loader2 className="w-16 h-16 animate-spin text-primary mb-4" />
-                        <h2 className="text-2xl font-bold">Verifying Location...</h2>
+                        <h2 className="text-2xl font-bold">Verifying...</h2>
                         <p className="text-muted-foreground">Please wait a moment.</p>
                     </div>
                 );
@@ -153,7 +184,7 @@ export default function ScanPage() {
                             <AlertTitle>Error</AlertTitle>
                             <AlertDescription>{errorMessage}</AlertDescription>
                         </Alert>
-                        <Button onClick={() => setScanState('idle')}>
+                        <Button onClick={() => window.location.reload()}>
                             Try Again
                         </Button>
                     </div>
@@ -161,7 +192,7 @@ export default function ScanPage() {
             case 'scanning':
                 return (
                     <div className="relative w-full h-full bg-black">
-                       <div id={QR_READER_ELEMENT_ID} className="w-full h-full" />
+                       <video id={QR_READER_ELEMENT_ID} ref={videoRef} className="w-full h-full object-cover" muted playsInline />
                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="w-[70vw] h-[70vw] max-w-[300px] max-h-[300px] border-4 border-primary/80 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]" />
                        </div>
@@ -174,12 +205,22 @@ export default function ScanPage() {
             default:
                  return (
                     <div className="p-12 text-center flex flex-col items-center justify-center h-full">
-                        <Video className="w-16 h-16 text-primary mb-4" />
-                        <h2 className="text-2xl font-bold mb-2">Ready to Scan</h2>
-                        <p className="text-muted-foreground mb-6">Press the button to start the camera and scan the QR code for attendance.</p>
-                        <Button size="lg" onClick={startScanner}>
-                            Start Camera
-                        </Button>
+                        {!hasCameraPermission ? (
+                             <div className="flex flex-col items-center justify-center">
+                                <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+                                <h2 className="text-xl font-bold">Requesting Camera...</h2>
+                                <p className="text-muted-foreground mt-2">Please allow camera access in your browser.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <Video className="w-16 h-16 text-primary mb-4" />
+                                <h2 className="text-2xl font-bold mb-2">Ready to Scan</h2>
+                                <p className="text-muted-foreground mb-6">Press the button to start the scanner.</p>
+                                <Button size="lg" onClick={startScanner}>
+                                    Start Scanner
+                                </Button>
+                            </>
+                        )}
                     </div>
                 );
         }
@@ -210,3 +251,5 @@ export default function ScanPage() {
         </div>
     );
 }
+
+    
