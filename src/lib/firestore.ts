@@ -97,8 +97,15 @@ export const getCenterLocation = async (): Promise<CenterLocation | null> => {
         return null;
     }
     const data = docSnap.data();
-    return {
-        ...data,
-        updatedAt: (data.updatedAt as Timestamp).toDate()
-    } as CenterLocation;
+
+    // Ensure updatedAt exists before converting
+    if (data && data.updatedAt) {
+        return {
+            ...data,
+            updatedAt: (data.updatedAt as Timestamp).toDate()
+        } as CenterLocation;
+    }
+    
+    // Return data without updatedAt if it's missing
+    return data as CenterLocation;
 };
