@@ -13,12 +13,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddWorkerForm } from '@/components/add-worker-form';
 import { EditWorkerForm } from '@/components/edit-worker-form';
-import { PlusCircle, Users, LogOut, Edit, Trash2, Download, Loader2, ThumbsUp, ThumbsDown, History, Hourglass } from 'lucide-react';
+import { PlusCircle, Users, LogOut, Edit, Trash2, Download, Loader2, ThumbsUp, ThumbsDown, History, Hourglass, QrCode } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getWorkers, addWorker, updateWorker, deleteWorker, getAttendanceRecords, updateAttendanceStatus } from '@/lib/firestore';
+import { QrCodeDialog } from '@/components/qr-code-dialog';
 
 export default function AdminPage() {
     const router = useRouter();
@@ -28,6 +29,7 @@ export default function AdminPage() {
     const [isAddWorkerOpen, setAddWorkerOpen] = useState(false);
     const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isQrCodeOpen, setQrCodeOpen] = useState(false);
 
     useEffect(() => {
         const isAuthenticated = localStorage.getItem('isAdminAuthenticated');
@@ -112,7 +114,6 @@ export default function AdminPage() {
         }
     }
 
-
     const handleExportPdf = async () => {
         const records = attendanceRecords.filter(r => r.status === 'approved');
         if (records.length === 0) {
@@ -188,6 +189,9 @@ export default function AdminPage() {
                    <h1 className="text-2xl md:text-3xl font-bold font-headline text-primary cursor-pointer hover:underline">Admin Dashboard</h1>
                 </Link>
                 <div className="flex flex-wrap items-center gap-2">
+                     <Button variant="outline" onClick={() => setQrCodeOpen(true)}>
+                        <QrCode className="mr-2" /> Show QR Code
+                     </Button>
                      <Button variant="outline" onClick={handleExportPdf}>
                         <Download className="mr-2" /> Export Approved PDF
                      </Button>
@@ -325,6 +329,9 @@ export default function AdminPage() {
                     </DialogContent>
                 </Dialog>
             )}
+
+            <QrCodeDialog open={isQrCodeOpen} onOpenChange={setQrCodeOpen} />
+
         </div>
     );
 }
@@ -381,3 +388,5 @@ const AttendanceTable = ({ records, onApproval }: AttendanceTableProps) => {
         </Table>
     );
 };
+
+    

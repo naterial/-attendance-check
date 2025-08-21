@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import Link from 'next/link';
 import { AttendanceCard } from "@/components/attendance-card";
 import type { AttendanceRecord } from "@/lib/types";
-import { User, LogIn, ShieldCheck, Loader2 } from "lucide-react";
+import { User, LogIn, ShieldCheck, Loader2, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, parse } from "date-fns";
 import { onSnapshot, collection, query, orderBy } from "firebase/firestore";
@@ -72,10 +72,10 @@ export default function Home() {
         </header>
 
         <div className="text-center mb-10 md:mb-12">
-          <Link href="/attendance" passHref>
+          <Link href="/scan" passHref>
             <Button size="lg" className="h-12 text-md md:h-14 md:text-lg">
-              <LogIn className="mr-3 size-5 md:size-6" />
-              Mark My Attendance
+              <ScanLine className="mr-3 size-5 md:size-6" />
+              Scan to Sign In
             </Button>
           </Link>
         </div>
@@ -123,3 +123,5 @@ export default function Home() {
     </div>
   );
 }
+
+    

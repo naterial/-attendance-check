@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from 'next/navigation';
 import { AttendancePinForm } from "@/components/attendance-pin-form";
 import type { AttendanceRecord } from "@/lib/types";
@@ -73,3 +73,5 @@ export default function AttendancePage() {
     </div>
   );
 }
+
+    
