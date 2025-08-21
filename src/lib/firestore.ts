@@ -14,7 +14,7 @@ import {
     setDoc,
     getDoc
 } from 'firebase/firestore';
-import type { Worker, AttendanceRecord, Shift, WorkerRole, CenterLocation } from './types';
+import type { Worker, AttendanceRecord, Shift, WorkerRole } from './types';
 
 // Type helper to convert Firestore Timestamps to Dates
 const fromFirestore = <T extends { timestamp?: Timestamp }>(docData: T): Omit<T, 'timestamp'> & { timestamp: Date } => {
@@ -80,32 +80,8 @@ export const getAttendanceRecords = async (): Promise<AttendanceRecord[]> => {
     });
 };
 
-// Center Location Functions
-export const setCenterLocation = async (location: Omit<CenterLocation, 'updatedAt'>): Promise<void> => {
-    const locationRef = doc(db, 'config', 'centerLocation');
-    const locationWithTimestamp = {
-        ...location,
-        updatedAt: Timestamp.now()
-    }
-    await setDoc(locationRef, locationWithTimestamp, { merge: true });
-};
 
-export const getCenterLocation = async (): Promise<CenterLocation | null> => {
-    const locationRef = doc(db, 'config', 'centerLocation');
-    const docSnap = await getDoc(locationRef);
-    if (!docSnap.exists()) {
-        return null;
-    }
-    const data = docSnap.data();
-
-    // Ensure updatedAt exists before converting
-    if (data && data.updatedAt) {
-        return {
-            ...data,
-            updatedAt: (data.updatedAt as Timestamp).toDate()
-        } as CenterLocation;
-    }
-    
-    // Return data without updatedAt if it's missing
-    return data as CenterLocation;
+export const updateAttendanceStatus = async (id: string, status: 'approved' | 'rejected'): Promise<void> => {
+    const recordRef = doc(db, 'attendanceRecords', id);
+    await updateDoc(recordRef, { status });
 };

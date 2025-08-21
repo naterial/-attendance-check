@@ -5,10 +5,9 @@ import { useState, useEffect } from "react";
 import Link from 'next/link';
 import { AttendanceCard } from "@/components/attendance-card";
 import type { AttendanceRecord } from "@/lib/types";
-import { User, QrCode, ShieldCheck, Loader2 } from "lucide-react";
+import { User, LogIn, ShieldCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format, parse } from "date-fns";
-import { getAttendanceRecords } from "@/lib/firestore";
 import { onSnapshot, collection, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -55,7 +54,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background font-body">
       <header className="absolute top-4 right-4 z-10">
-          <Link href="/admin/login" passHref>
+          <Link href="/admin" passHref>
             <Button variant="outline">
               <ShieldCheck className="mr-2" />
               Admin
@@ -73,10 +72,10 @@ export default function Home() {
         </header>
 
         <div className="text-center mb-10 md:mb-12">
-          <Link href="/scan" passHref>
+          <Link href="/attendance" passHref>
             <Button size="lg" className="h-12 text-md md:h-14 md:text-lg">
-              <QrCode className="mr-3 size-5 md:size-6" />
-              Scan to Sign In
+              <LogIn className="mr-3 size-5 md:size-6" />
+              Mark My Attendance
             </Button>
           </Link>
         </div>
@@ -116,7 +115,7 @@ export default function Home() {
                   </div>
                 </div>
                 <h3 className="text-lg md:text-xl font-semibold text-foreground/80">No attendance records yet.</h3>
-                <p className="text-sm text-muted-foreground mt-1 px-2">Workers can sign in using the QR code scanner.</p>
+                <p className="text-sm text-muted-foreground mt-1 px-2">Workers can mark their attendance to get started.</p>
             </div>
           )}
         </div>
@@ -124,4 +123,3 @@ export default function Home() {
     </div>
   );
 }
-

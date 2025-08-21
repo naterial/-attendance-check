@@ -34,13 +34,14 @@ export default function AttendancePage() {
           role: worker.role,
           shift: worker.shift,
           notes: data.notes || '',
+          status: 'pending'
         };
         
         await addAttendanceRecord(newRecord);
         
         toast({
             title: "Attendance Submitted!",
-            description: `Thank you, ${worker.name}. Your attendance has been logged.`,
+            description: `Thank you, ${worker.name}. Your submission is pending approval.`,
         });
 
         router.push('/');

@@ -1,5 +1,6 @@
 export type WorkerRole = 'Carer' | 'Cook' | 'Cleaner' | 'Executive' | 'Volunteer';
 export type Shift = 'Morning' | 'Afternoon' | 'Off Day';
+export type AttendanceStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Worker {
   id: string;
@@ -17,11 +18,5 @@ export interface AttendanceRecord {
   shift: Shift;
   notes: string;
   timestamp: Date;
-}
-
-export interface CenterLocation {
-  lat: number;
-  lon: number;
-  radius: number;
-  updatedAt: Date;
+  status: AttendanceStatus;
 }

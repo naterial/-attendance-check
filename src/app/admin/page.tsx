@@ -7,26 +7,26 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { Worker, AttendanceRecord, CenterLocation } from '@/lib/types';
+import type { Worker, AttendanceRecord } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AddWorkerForm } from '@/components/add-worker-form';
 import { EditWorkerForm } from '@/components/edit-worker-form';
-import { PlusCircle, Users, LogOut, QrCode, Edit, Trash2, Download, MapPin, Loader2 } from 'lucide-react';
+import { PlusCircle, Users, LogOut, Edit, Trash2, Download, Loader2, ThumbsUp, ThumbsDown, History, Hourglass } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { getWorkers, addWorker, updateWorker, deleteWorker, getAttendanceRecords, getCenterLocation, setCenterLocation as setFirestoreLocation } from '@/lib/firestore';
+import { getWorkers, addWorker, updateWorker, deleteWorker, getAttendanceRecords, updateAttendanceStatus } from '@/lib/firestore';
 
 export default function AdminPage() {
     const router = useRouter();
     const { toast } = useToast();
     const [workers, setWorkers] = useState<Worker[]>([]);
+    const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
     const [isAddWorkerOpen, setAddWorkerOpen] = useState(false);
     const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
-    const [centerLocation, setCenterLocation] = useState<CenterLocation | null>(null);
-    const [isSettingLocation, setIsSettingLocation] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -35,38 +35,30 @@ export default function AdminPage() {
             router.push('/admin/login');
             return;
         }
-
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                const [workersData, locationData] = await Promise.all([
-                    getWorkers(),
-                    getCenterLocation()
-                ]);
-                setWorkers(workersData);
-                if (locationData) {
-                    setCenterLocation(locationData);
-                }
-            } catch (error) {
-                console.error("Failed to fetch initial data:", error);
-                toast({ variant: "destructive", title: "Error", description: "Failed to load data from the database." });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
         fetchData();
-    }, [router, toast]);
+    }, [router]);
     
-    const fetchWorkers = async () => {
-        const workersData = await getWorkers();
-        setWorkers(workersData);
+    const fetchData = async () => {
+        setIsLoading(true);
+        try {
+            const [workersData, recordsData] = await Promise.all([
+                getWorkers(),
+                getAttendanceRecords()
+            ]);
+            setWorkers(workersData);
+            setAttendanceRecords(recordsData);
+        } catch (error) {
+            console.error("Failed to fetch initial data:", error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to load data from the database." });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleAddWorker = async (newWorkerData: Omit<Worker, 'id'>) => {
        try {
             await addWorker(newWorkerData);
-            await fetchWorkers();
+            await fetchData();
             setAddWorkerOpen(false);
             toast({ title: "Success", description: "New worker has been added." });
         } catch (error) {
@@ -78,7 +70,7 @@ export default function AdminPage() {
     const handleUpdateWorker = async (updatedWorker: Worker) => {
         try {
             await updateWorker(updatedWorker.id, updatedWorker);
-            await fetchWorkers();
+            await fetchData();
             setEditingWorker(null);
             toast({ title: "Success", description: "Worker details have been updated." });
         } catch (error) {
@@ -90,7 +82,7 @@ export default function AdminPage() {
     const handleDeleteWorker = async (workerId: string) => {
         try {
             await deleteWorker(workerId);
-            await fetchWorkers();
+            await fetchData();
             toast({ title: "Success", description: "Worker has been deleted." });
         } catch (error) {
             console.error("Failed to delete worker:", error);
@@ -103,60 +95,28 @@ export default function AdminPage() {
         router.push('/admin/login');
     };
 
-    const handleSetLocation = () => {
-        setIsSettingLocation(true);
-        if (!navigator.geolocation) {
+    const handleApproval = async (id: string, status: 'approved' | 'rejected') => {
+        try {
+            await updateAttendanceStatus(id, status);
+            await fetchData();
             toast({
+                title: 'Success',
+                description: `Record has been ${status}.`
+            })
+        } catch(e) {
+             toast({
                 variant: 'destructive',
-                title: 'Geolocation Not Supported',
-                description: 'Your browser does not support geolocation.',
+                title: 'Database Error',
+                description: "Failed to update the record status.",
             });
-            setIsSettingLocation(false);
-            return;
         }
+    }
 
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                const newLocation = {
-                    lat: position.coords.latitude,
-                    lon: position.coords.longitude,
-                    radius: 50, // Default radius in meters
-                };
-                try {
-                    await setFirestoreLocation(newLocation);
-                    const fetchedLocation = await getCenterLocation();
-                    setCenterLocation(fetchedLocation);
-                    toast({
-                        title: 'Location Set!',
-                        description: 'The new center location has been saved.',
-                    });
-                } catch (error) {
-                     console.error("Failed to save location:", error);
-                     toast({
-                        variant: 'destructive',
-                        title: 'Database Error',
-                        description: "Failed to save the location.",
-                    });
-                } finally {
-                    setIsSettingLocation(false);
-                }
-            },
-            (error) => {
-                toast({
-                    variant: 'destructive',
-                    title: 'Failed to Get Location',
-                    description: error.message,
-                });
-                setIsSettingLocation(false);
-            },
-            { enableHighAccuracy: true }
-        );
-    };
 
     const handleExportPdf = async () => {
-        const records = await getAttendanceRecords();
+        const records = attendanceRecords.filter(r => r.status === 'approved');
         if (records.length === 0) {
-            toast({ variant: 'destructive', title: 'No records to export.'});
+            toast({ variant: 'destructive', title: 'No approved records to export.'});
             return;
         }
 
@@ -206,7 +166,7 @@ export default function AdminPage() {
             startY = (doc as any).lastAutoTable.finalY + 15;
         });
 
-        doc.save(`attendance-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+        doc.save(`approved-attendance-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
 
     if (isLoading) {
@@ -216,6 +176,10 @@ export default function AdminPage() {
             </div>
         );
     }
+    
+    const pendingRecords = attendanceRecords.filter(r => r.status === 'pending');
+    const processedRecords = attendanceRecords.filter(r => r.status === 'approved' || r.status === 'rejected');
+
 
     return (
         <div className="min-h-screen bg-background font-body p-4 md:p-6">
@@ -225,13 +189,8 @@ export default function AdminPage() {
                 </Link>
                 <div className="flex flex-wrap items-center gap-2">
                      <Button variant="outline" onClick={handleExportPdf}>
-                        <Download className="mr-2" /> Export PDF
+                        <Download className="mr-2" /> Export Approved PDF
                      </Button>
-                     <Link href="/qr-code" passHref>
-                        <Button variant="outline">
-                            <QrCode className="mr-2" /> View QR
-                        </Button>
-                    </Link>
                     <Button variant="ghost" onClick={handleLogout}>
                         <LogOut className="mr-2" /> Logout
                     </Button>
@@ -240,26 +199,26 @@ export default function AdminPage() {
             <main className="container mx-auto px-0 space-y-8">
                  <Card>
                     <CardHeader>
-                        <CardTitle>Center Location</CardTitle>
-                        <CardDescription>Set the official GPS location for attendance verification.</CardDescription>
+                        <CardTitle>Attendance Approval</CardTitle>
+                        <CardDescription>Review and approve or reject pending attendance submissions.</CardDescription>
                     </CardHeader>
-                    <CardContent className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                        <Button onClick={handleSetLocation} disabled={isSettingLocation}>
-                            {isSettingLocation ? <Loader2 className="mr-2 animate-spin" /> : <MapPin className="mr-2" />}
-                            {isSettingLocation ? 'Fetching...' : 'Set Current Location as Center'}
-                        </Button>
-                        {centerLocation && centerLocation.lat ? (
-                            <div className="text-sm text-muted-foreground p-2 rounded-md bg-muted">
-                                <p className="font-semibold">Current Location Set:</p>
-                                <p>Lat: {centerLocation.lat.toFixed(6)}, Lon: {centerLocation.lon.toFixed(6)}</p>
-                                <p>Radius: {centerLocation.radius} meters</p>
-                                {centerLocation.updatedAt && (
-                                  <p className="text-xs mt-1">Last Updated: {format(centerLocation.updatedAt, 'PPP p')}</p>
-                                )}
-                            </div>
-                        ) : (
-                            <p className="text-sm text-destructive-foreground p-2 rounded-md bg-destructive/80">No location has been set yet.</p>
-                        )}
+                    <CardContent>
+                        <Tabs defaultValue="pending">
+                            <TabsList className="mb-4">
+                                <TabsTrigger value="pending">
+                                    <Hourglass className="mr-2" /> Pending ({pendingRecords.length})
+                                </TabsTrigger>
+                                <TabsTrigger value="history">
+                                    <History className="mr-2" /> History ({processedRecords.length})
+                                </TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="pending">
+                                <AttendanceTable records={pendingRecords} onApproval={handleApproval} />
+                            </TabsContent>
+                             <TabsContent value="history">
+                                <AttendanceTable records={processedRecords} />
+                            </TabsContent>
+                        </Tabs>
                     </CardContent>
                 </Card>
                 <Card>
@@ -369,3 +328,56 @@ export default function AdminPage() {
         </div>
     );
 }
+
+interface AttendanceTableProps {
+    records: AttendanceRecord[];
+    onApproval?: (id: string, status: 'approved' | 'rejected') => void;
+}
+
+const AttendanceTable = ({ records, onApproval }: AttendanceTableProps) => {
+    if (records.length === 0) {
+        return <p className="text-center text-muted-foreground py-8">No records to display.</p>;
+    }
+    
+    return (
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Worker</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead className="hidden md:table-cell">Notes</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {records.map(record => (
+                    <TableRow key={record.id}>
+                        <TableCell>
+                            <div className="font-medium">{record.name}</div>
+                            <div className="text-sm text-muted-foreground">{record.role} - {record.shift}</div>
+                        </TableCell>
+                        <TableCell>{format(record.timestamp, 'p')}</TableCell>
+                        <TableCell className="hidden md:table-cell max-w-xs truncate">{record.notes}</TableCell>
+                        <TableCell className="text-right">
+                           {record.status === 'pending' && onApproval && (
+                               <div className="flex justify-end gap-2">
+                                   <Button variant="outline" size="sm" onClick={() => onApproval(record.id, 'approved')}>
+                                       <ThumbsUp className="mr-2 h-4 w-4" /> Approve
+                                   </Button>
+                                   <Button variant="destructive" size="sm" onClick={() => onApproval(record.id, 'rejected')}>
+                                       <ThumbsDown className="mr-2 h-4 w-4" /> Reject
+                                   </Button>
+                               </div>
+                           )}
+                           {record.status !== 'pending' && (
+                               <span className={`text-sm font-semibold ${record.status === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
+                                   {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                               </span>
+                           )}
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+};
